@@ -371,16 +371,10 @@ final class AVAudioEnginePcmGraph: @unchecked Sendable
             return
         }
         var error: NSError?
-        var inputProvided = false
+        let source = SingleBufferInput(buffer)
         let status = converter.convert(to: output, error: &error) {
             _, outStatus in
-            if inputProvided {
-                outStatus.pointee = .noDataNow
-                return nil
-            }
-            inputProvided = true
-            outStatus.pointee = .haveData
-            return buffer
+            source.next(outStatus)
         }
         if error != nil || status == .error {
             return
@@ -439,16 +433,10 @@ final class AVAudioEnginePcmGraph: @unchecked Sendable
             throw AudioFailure.playback
         }
         var error: NSError?
-        var inputProvided = false
+        let source = SingleBufferInput(input)
         let status = converter.convert(to: output, error: &error) {
             _, outStatus in
-            if inputProvided {
-                outStatus.pointee = .noDataNow
-                return nil
-            }
-            inputProvided = true
-            outStatus.pointee = .haveData
-            return input
+            source.next(outStatus)
         }
         if error != nil || status == .error {
             throw AudioFailure.playback
@@ -665,5 +653,31 @@ final class AVAudioEnginePcmAudio: @unchecked Sendable {
     func dispose() async {
         await player.dispose()
         await recorder.dispose()
+    }
+}
+
+/// Feeds exactly one buffer to `AVAudioConverter.convert`.
+///
+/// The converter calls its input block synchronously on the calling
+/// thread, but newer SDKs type the block `@Sendable`, so the one-shot
+/// flag lives in a box rather than in a captured local.
+private final class SingleBufferInput: @unchecked Sendable {
+    private let buffer: AVAudioPCMBuffer
+    private var provided = false
+
+    init(_ buffer: AVAudioPCMBuffer) {
+        self.buffer = buffer
+    }
+
+    func next(
+        _ outStatus: UnsafeMutablePointer<AVAudioConverterInputStatus>,
+    ) -> AVAudioPCMBuffer? {
+        if provided {
+            outStatus.pointee = .noDataNow
+            return nil
+        }
+        provided = true
+        outStatus.pointee = .haveData
+        return buffer
     }
 }
