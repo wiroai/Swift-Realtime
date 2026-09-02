@@ -30,6 +30,21 @@ live Wiro model over one WebSocket protocol:
 | Transcription | [`mistralai/voxtral-mini-4b-realtime-2602`](https://wiro.ai/models) | Live speech-to-text as you talk |
 | Speech | [`openmoss/moss-tts-realtime`](https://wiro.ai/models) | Streaming text-to-speech playback |
 
+<div align="center">
+<table>
+  <tr>
+    <td align="center"><b>Conversation</b></td>
+    <td align="center"><b>Transcription</b></td>
+    <td align="center"><b>Speech</b></td>
+  </tr>
+  <tr>
+    <td><img src="docs/images/conversation.png" width="260" alt="Speech-to-speech conversation" /></td>
+    <td><img src="docs/images/transcription.png" width="260" alt="Realtime transcription" /></td>
+    <td><img src="docs/images/speech.png" width="260" alt="Text-to-speech" /></td>
+  </tr>
+</table>
+</div>
+
 The chrome is system SwiftUI: `TabView`, `NavigationStack`, toolbar
 items, `Menu`, `Form`, `List`. Liquid Glass comes from iOS 26. There
 is no custom orb, wave, or tab bar.
