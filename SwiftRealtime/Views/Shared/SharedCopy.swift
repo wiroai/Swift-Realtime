@@ -2,6 +2,8 @@
 enum SharedCopy {
     static let done = "Done"
     static let ok = "OK"
+    static let listening = "Listening"
+    static let muted = "Muted"
 }
 
 /// Catalog option values are lowercase ids (`cedar`, `balanced`).

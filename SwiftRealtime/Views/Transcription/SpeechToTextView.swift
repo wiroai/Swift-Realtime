@@ -37,22 +37,12 @@ struct SpeechToTextView: View {
                 .navigationBarTitleDisplayMode(.large)
                 .navigationSubtitle(subtitle)
                 .toolbar { toolbarContent }
-                .alert(
-                    SystemSettingsCopy.alertTitle,
-                    isPresented: .dismissal(
-                        isPresented: model.state.showsSystemSettingsAlert,
-                        onDismiss: model.dismissSystemSettingsAlert,
-                    ),
-                ) {
-                    Button(SystemSettingsCopy.open) {
-                        Task { await model.openSystemSettings() }
-                    }
-                    Button(SharedCopy.ok, role: .cancel) {}
-                } message: {
-                    if let message = model.state.errorMessage {
-                        Text(message)
-                    }
-                }
+                .microphoneAccessAlert(
+                    isPresented: model.state.showsSystemSettingsAlert,
+                    message: model.state.errorMessage,
+                    openSettings: model.openSystemSettings,
+                    onDismiss: model.dismissSystemSettingsAlert,
+                )
         }
         .sensoryFeedback(trigger: model.state.isLive) { _, live in
             live ? .start : .stop
@@ -77,40 +67,22 @@ struct SpeechToTextView: View {
     @ViewBuilder
     private var stageContent: some View {
         if model.state.showsConnecting {
-            ContentUnavailableView {
-                ProgressView()
-            }
+            SessionStage.connecting
         } else if model.state.sessionState == .failure,
                   let message = model.state.errorMessage,
                   model.state.transcript.isEmpty
         {
-            ContentUnavailableView {
-                Label(message, systemImage: "exclamationmark.triangle")
-            } description: {
-                EmptyView()
-            } actions: {
-                if model.state.canOpenSystemSettings {
-                    Button(SystemSettingsCopy.open) {
-                        Task { await model.openSystemSettings() }
-                    }
-                    .accessibilityIdentifier("open-settings-control")
-                }
-            }
+            SessionStage.failure(
+                message,
+                canOpenSettings: model.state.canOpenSystemSettings,
+                openSettings: model.openSystemSettings,
+            )
         } else if !model.state.transcript.isEmpty {
             transcriptList
         } else if model.state.isLive {
-            ContentUnavailableView(
-                model.state.muted
-                    ? TranscriptionCopy.muted
-                    : TranscriptionCopy.listening,
-                systemImage: model.state.muted ? "mic.slash" : "waveform",
-            )
+            SessionStage.listening(muted: model.state.muted)
         } else {
-            ContentUnavailableView {
-                Image(systemName: "text.quote")
-                    .font(.system(size: 56))
-                    .foregroundStyle(.tertiary)
-            }
+            SessionStage.idle(systemImage: "text.quote")
         }
     }
 
@@ -126,11 +98,8 @@ struct SpeechToTextView: View {
                             systemImage: "exclamationmark.triangle",
                         )
                         if model.state.canOpenSystemSettings {
-                            Button(SystemSettingsCopy.open) {
-                                Task { await model.openSystemSettings() }
-                            }
-                            .accessibilityIdentifier(
-                                "open-settings-control",
+                            OpenSettingsButton(
+                                openSettings: model.openSystemSettings,
                             )
                         }
                     }

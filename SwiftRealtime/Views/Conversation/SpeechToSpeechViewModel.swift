@@ -100,6 +100,12 @@ final class SpeechToSpeechViewModel {
         return lease.owner == .conversation
     }
 
+    /// Settings apply to the next task, so they are edited between
+    /// sessions only.
+    var canEditSettings: Bool {
+        displayedStage == .ready || displayedStage == .failed
+    }
+
     var canChangeVoice: Bool {
         if state.isReconfiguring || state.showsConnecting {
             return false

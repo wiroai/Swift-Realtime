@@ -145,7 +145,6 @@ final class TextToSpeechViewModel {
         state.selectedModel = snapshot.selectedModel
         state.sessionState = snapshot.sessionState
         state.elapsed = snapshot.elapsed
-        state.isPlaying = snapshot.isPlaying
         state.errorMessage = snapshot.errorMessage
     }
 }

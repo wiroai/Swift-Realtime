@@ -40,22 +40,12 @@ struct SpeechToSpeechView: View {
                 .sheet(isPresented: $showsSettings) {
                     ConversationSettingsView(model: model)
                 }
-                .alert(
-                    SystemSettingsCopy.alertTitle,
-                    isPresented: .dismissal(
-                        isPresented: model.state.showsSystemSettingsAlert,
-                        onDismiss: model.dismissSystemSettingsAlert,
-                    ),
-                ) {
-                    Button(SystemSettingsCopy.open) {
-                        Task { await model.openSystemSettings() }
-                    }
-                    Button(SharedCopy.ok, role: .cancel) {}
-                } message: {
-                    if let message = model.state.errorMessage {
-                        Text(message)
-                    }
-                }
+                .microphoneAccessAlert(
+                    isPresented: model.state.showsSystemSettingsAlert,
+                    message: model.state.errorMessage,
+                    openSettings: model.openSystemSettings,
+                    onDismiss: model.dismissSystemSettingsAlert,
+                )
         }
         .sensoryFeedback(trigger: isLive) { _, live in
             live ? .start : .stop
@@ -93,39 +83,21 @@ struct SpeechToSpeechView: View {
         if model.state.showsConnecting
             || (model.state.isRestoring && !hasTranscripts)
         {
-            ContentUnavailableView {
-                ProgressView()
-            }
+            SessionStage.connecting
         } else if model.displayedStage == .failed,
                   let message = model.state.errorMessage
         {
-            ContentUnavailableView {
-                Label(message, systemImage: "exclamationmark.triangle")
-            } description: {
-                EmptyView()
-            } actions: {
-                if model.state.canOpenSystemSettings {
-                    Button(SystemSettingsCopy.open) {
-                        Task { await model.openSystemSettings() }
-                    }
-                    .accessibilityIdentifier("open-settings-control")
-                }
-            }
+            SessionStage.failure(
+                message,
+                canOpenSettings: model.state.canOpenSystemSettings,
+                openSettings: model.openSystemSettings,
+            )
         } else if hasTranscripts {
             transcriptList
         } else if isLive {
-            ContentUnavailableView(
-                model.state.muted
-                    ? ConversationCopy.muted
-                    : ConversationCopy.listening,
-                systemImage: model.state.muted ? "mic.slash" : "waveform",
-            )
+            SessionStage.listening(muted: model.state.muted)
         } else {
-            ContentUnavailableView {
-                Image(systemName: "bubble.left.and.bubble.right")
-                    .font(.system(size: 56))
-                    .foregroundStyle(.tertiary)
-            }
+            SessionStage.idle(systemImage: "bubble.left.and.bubble.right")
         }
     }
 
@@ -195,7 +167,7 @@ struct SpeechToSpeechView: View {
                 }
             }
         }
-        if canEditSettings {
+        if model.canEditSettings {
             ToolbarItem(placement: .automatic) {
                 Button(
                     ConversationCopy.settings,
@@ -264,11 +236,6 @@ struct SpeechToSpeechView: View {
         model.displayedStage == .live
     }
 
-    private var canEditSettings: Bool {
-        model.displayedStage == .ready
-            || model.displayedStage == .failed
-    }
-
     private var hasTranscripts: Bool {
         !model.state.userTranscript.isEmpty
             || !model.state.aiTranscript.isEmpty
@@ -297,12 +264,7 @@ struct ConversationSettingsView: View {
                     Button(SharedCopy.done) { dismiss() }
                 }
             }
-            .disabled(!canEditSettings)
+            .disabled(!model.canEditSettings)
         }
-    }
-
-    private var canEditSettings: Bool {
-        model.displayedStage == .ready
-            || model.displayedStage == .failed
     }
 }

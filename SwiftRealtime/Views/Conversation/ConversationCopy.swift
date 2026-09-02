@@ -9,8 +9,6 @@ enum ConversationCopy {
     static let interrupt = "Silence assistant"
     static let voice = "Voice"
     static let settings = "Settings"
-    static let listening = "Listening"
-    static let muted = "Muted"
     static let you = "You"
     static let assistant = "Assistant"
 }

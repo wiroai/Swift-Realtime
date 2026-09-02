@@ -9,7 +9,6 @@ struct TextToSpeechState: Equatable, Sendable {
     var selectedModel: ModelDefinition
     var sessionState: RealtimeSessionState = .idle
     var elapsed: Duration = .zero
-    var isPlaying = false
     var errorMessage: String?
 
     var showsConnecting: Bool {

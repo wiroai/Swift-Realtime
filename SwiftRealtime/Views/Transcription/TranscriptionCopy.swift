@@ -10,8 +10,6 @@ enum TranscriptionCopy {
     static let copy = "Copy"
     static let more = "More"
     static let accuracy = "Accuracy"
-    static let listening = "Listening"
-    static let muted = "Muted"
 }
 
 enum TranscriptionFields {

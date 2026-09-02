@@ -19,7 +19,6 @@ final class TextToSpeechViewModelTests: XCTestCase {
             WiroModelCatalog.voxcpm2,
         )
         XCTAssertEqual(viewModel.state.sessionState, .streaming)
-        XCTAssertTrue(viewModel.state.isPlaying)
         await viewModel.dispose()
     }
 
@@ -42,7 +41,7 @@ final class TextToSpeechViewModelTests: XCTestCase {
         let state = harness.viewModel.state
         XCTAssertEqual(state.selectedModel, WiroModelCatalog.voxcpm2)
         XCTAssertEqual(state.sessionState, .streaming)
-        XCTAssertTrue(state.isPlaying)
+        XCTAssertEqual(state.elapsed, .seconds(4))
         XCTAssertEqual(state.errorMessage, "error")
         await harness.viewModel.dispose()
     }
@@ -105,13 +104,13 @@ final class TextToSpeechViewModelTests: XCTestCase {
         controller.publish(
             SpeechSessionSnapshot(
                 selectedModel: WiroModelCatalog.mossTtsRealtime,
-                isPlaying: true,
+                sessionState: .streaming,
             ),
         )
         try? await Task.sleep(for: .milliseconds(40))
 
         XCTAssertEqual(controller.disposeCalls, 1)
-        XCTAssertFalse(viewModel.state.isPlaying)
+        XCTAssertEqual(viewModel.state.sessionState, .idle)
     }
 
     private func makeHarness() -> (
