@@ -1,0 +1,20 @@
+# Mirrors AGENTS.md: 80 columns, trailing commas, why-only comments.
+# CI runs `swiftformat . --lint`; run `swiftformat .` locally to fix.
+--swiftversion 6.2
+--maxwidth 80
+--indent 4
+--trailing-commas always
+--wraparguments before-first
+--wrapparameters before-first
+--wrapcollections before-first
+--closingparen balanced
+--stripunusedargs closure-only
+--import-grouping testable-last
+--header ignore
+--extensionacl on-declarations
+--decimal-grouping ignore
+--disable braces, wrapMultilineStatementBraces, redundantReturn, hoistPatternLet, andOperator, blankLinesAtStartOfScope, redundantSelf, preferKeyPath, wrapPropertyBodies, hoistAwait, hoistTry, conditionalAssignment, noForceUnwrapInTests, redundantMemberwiseInit, opaqueGenericParameters, genericExtensions, redundantType
+--ranges no-space
+--hex-grouping ignore
+--binary-grouping ignore
+--ifdef no-indent

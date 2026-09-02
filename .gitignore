@@ -1,0 +1,20 @@
+# macOS
+.DS_Store
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# Xcode
+DerivedData/
+xcuserdata/
+*.xcresult
+*.xcworkspace/xcshareddata/swiftpm/
+
+# Test artifacts
+TestResults*
+
+# Local secrets
+.env
+.env.*
+Configs/Secrets.xcconfig

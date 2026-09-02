@@ -1,0 +1,7 @@
+// Empty defaults so $(WIRO_API_KEY) substitutes to blank, not the
+// literal token, when Secrets.xcconfig is missing.
+WIRO_API_KEY =
+WIRO_API_SECRET =
+
+// Optional local secrets. Copy Secrets.xcconfig.example.
+#include? "Secrets.xcconfig"

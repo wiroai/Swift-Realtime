@@ -1,0 +1,72 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Build and test (iOS Simulator)
+    runs-on: macos-26
+    timeout-minutes: 30
+    env:
+      # The suite never reaches the network; launch only checks that a
+      # key is present.
+      WIRO_API_KEY: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          xcrun simctl list devices available | grep "iPhone 17 Pro" \
+            || echo "iPhone 17 Pro simulator not listed"
+          command -v xcbeautify >/dev/null || brew install xcbeautify
+
+      - name: Test
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -scheme SwiftRealtime \
+            -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+            -resultBundlePath TestResults.xcresult \
+            -skipPackagePluginValidation \
+            | xcbeautify --renderer github-actions
+
+      - name: Upload result bundle
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: TestResults
+          path: TestResults.xcresult
+
+  lint:
+    name: Lint
+    runs-on: macos-26
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tools
+        run: brew install swiftformat swiftlint
+
+      - name: SwiftFormat (lint only)
+        run: swiftformat SwiftRealtime Tests --lint
+
+      - name: SwiftLint
+        run: swiftlint lint --strict
+
+      - name: 80-column check
+        run: |
+          long=$(find SwiftRealtime Tests -name '*.swift' \
+            -exec awk 'length > 80 {print FILENAME":"FNR}' {} +)
+          if [ -n "$long" ]; then
+            echo "Lines over 80 columns:"
+            echo "$long"
+            exit 1
+          fi
