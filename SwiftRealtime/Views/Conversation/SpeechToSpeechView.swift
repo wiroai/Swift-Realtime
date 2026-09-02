@@ -89,7 +89,9 @@ struct SpeechToSpeechView: View {
 
     @ViewBuilder
     private var stageContent: some View {
-        if model.state.showsConnecting {
+        if model.state.showsConnecting
+            || (model.state.isRestoring && !hasTranscripts)
+        {
             ContentUnavailableView {
                 ProgressView()
             }
@@ -162,9 +164,15 @@ struct SpeechToSpeechView: View {
             primaryControl
         }
         ToolbarItem(placement: .automatic) {
-            voiceMenu
+            if model.state.isRestoring {
+                ProgressView()
+                    .accessibilityLabel(ConversationCopy.voice)
+                    .accessibilityIdentifier("field-voice-restoring")
+            } else {
+                voiceMenu
+            }
         }
-        if isLive {
+        if isLive, !model.state.isRestoring {
             ToolbarItem(placement: .automatic) {
                 Button(
                     model.state.muted

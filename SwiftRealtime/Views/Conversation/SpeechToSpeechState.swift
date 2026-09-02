@@ -29,4 +29,13 @@ struct SpeechToSpeechState: Equatable, Sendable {
     var showsConnecting: Bool {
         reportsConnecting && sessionState.conversationStage == .connecting
     }
+
+    /// Live on screen, but nobody is being heard: a voice change or a
+    /// dropped socket is rebuilding the task. The clock and the
+    /// transcript stay; a spinner takes the voice slot and the
+    /// microphone controls are withheld until audio flows again.
+    var isRestoring: Bool {
+        displayedStage == .live
+            && sessionState.conversationStage == .connecting
+    }
 }
