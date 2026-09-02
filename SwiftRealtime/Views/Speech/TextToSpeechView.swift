@@ -146,8 +146,15 @@ struct TextToSpeechView: View {
                 Task { await model.start() }
             }
             .buttonStyle(.glassProminent)
-            .disabled(!model.canStart || model.prompt.isEmpty)
+            .disabled(!model.canStart || promptIsBlank)
         }
+    }
+
+    /// Matches the service's own check so Play never leads to the
+    /// empty-prompt failure line.
+    private var promptIsBlank: Bool {
+        model.prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+            .isEmpty
     }
 
     private var modelMenu: some View {
