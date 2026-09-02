@@ -118,6 +118,11 @@ final class ConversationTurnTaking: @unchecked Sendable {
         return true
     }
 
+    /// The finger on the glass is about to show up in the microphone.
+    func noteScreenTouch() {
+        bargeIn.noteScreenTouch()
+    }
+
     /// A muted microphone cannot be interrupting anyone.
     func noteMuted() {
         voiceActivity.resetUser()

@@ -159,6 +159,12 @@ final class SpeechToSpeechViewModel {
         sessionService.interruptAssistant()
     }
 
+    func noteScreenTouch() {
+        if displayedStage == .live {
+            sessionService.noteScreenTouch()
+        }
+    }
+
     func openSystemSettings() async {
         await sessionService.openSystemSettings()
     }

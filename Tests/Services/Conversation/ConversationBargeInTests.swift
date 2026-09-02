@@ -193,6 +193,45 @@ final class ConversationBargeInTests: XCTestCase {
         XCTAssertTrue(events.contains("assistant_interrupted"))
     }
 
+    func testAScreenTouchKeepsTheBurstItMakesFromHolding() async {
+        queueAssistantAudio()
+        bargeIn.noteScreenTouch()
+        feedLoudUserChunks(count: 3)
+
+        XCTAssertFalse(playback.isHolding)
+        XCTAssertEqual(player.flushes, 0)
+        XCTAssertTrue(events.isEmpty)
+
+        // Once the grace lapses the same burst holds as before.
+        await clock.advance(by: .milliseconds(400))
+        for _ in 0..<3 {
+            voiceActivity.addUserChunk(conversationPcm(amplitude: 0))
+            bargeIn.evaluate()
+        }
+        feedLoudUserChunks(count: 3)
+
+        XCTAssertTrue(playback.isHolding)
+        XCTAssertEqual(events, ["assistant_playback_held"])
+    }
+
+    func testAScreenTouchDoesNotDisturbAHoldAlreadyInProgress() {
+        queueAssistantAudio()
+        feedLoudUserChunks(count: 3)
+        XCTAssertTrue(playback.isHolding)
+
+        bargeIn.noteScreenTouch()
+        for _ in 0..<3 {
+            voiceActivity.addUserChunk(conversationPcm(amplitude: 0))
+            bargeIn.evaluate()
+        }
+
+        XCTAssertFalse(playback.isHolding)
+        XCTAssertEqual(
+            events,
+            ["assistant_playback_held", "assistant_playback_resumed"],
+        )
+    }
+
     private func queueAssistantAudio() {
         let chunk = conversationPcm(
             amplitude: 8_000,

@@ -22,6 +22,9 @@ protocol ConversationSessionController: AnyObject, Sendable {
     func setMuted(_ muted: Bool)
     func setParameter(_ value: String, for id: String)
     func interruptAssistant()
+    /// The screen was touched. Barge-in detection ignores the burst
+    /// the finger makes in the microphone.
+    func noteScreenTouch()
     func openSystemSettings() async
     func dispose() async
 }

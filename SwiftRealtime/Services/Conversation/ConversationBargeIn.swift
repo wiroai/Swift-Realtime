@@ -10,12 +10,20 @@ import os
 /// mic mid-hold still resolves, rather than waiting on the next
 /// chunk.
 ///
+/// A finger landing on the glass is the loudest thing the microphone
+/// hears from a few centimetres away, and it arrives in the same
+/// three-chunk burst a spoken syllable does. The screen reports each
+/// touch; for `touchGrace` after one, nothing new is suspected, so
+/// opening a menu mid-answer does not silence the answer.
+///
 /// `evaluate()` runs on the microphone's capture thread; the hold
-/// deadline fires on its own task. Both touch the same bookkeeping,
-/// so it lives behind one lock.
+/// deadline fires on its own task; `noteScreenTouch()` comes from
+/// the main thread. All three touch the same bookkeeping, so it
+/// lives behind one lock.
 final class ConversationBargeIn: @unchecked Sendable {
     private struct State {
         var holdSuppressedUntil: ContinuousClock.Instant?
+        var touchSuppressedUntil: ContinuousClock.Instant?
         var holdTask: Task<Void, Never>?
         var disposed = false
     }
@@ -25,6 +33,7 @@ final class ConversationBargeIn: @unchecked Sendable {
     private let onProtocolEvent: @Sendable (String) -> Void
     private let holdTimeout: Duration
     private let holdCooldown: Duration
+    private let touchGrace: Duration
     private let clock: any RealtimeClock
     private let state = OSAllocatedUnfairLock(initialState: State())
 
@@ -34,6 +43,7 @@ final class ConversationBargeIn: @unchecked Sendable {
         onProtocolEvent: @escaping @Sendable (String) -> Void,
         holdTimeout: Duration = .milliseconds(900),
         holdCooldown: Duration = .milliseconds(1_500),
+        touchGrace: Duration = .milliseconds(400),
         clock: any RealtimeClock = ContinuousClock(),
     ) {
         self.playback = playback
@@ -41,7 +51,20 @@ final class ConversationBargeIn: @unchecked Sendable {
         self.onProtocolEvent = onProtocolEvent
         self.holdTimeout = holdTimeout
         self.holdCooldown = holdCooldown
+        self.touchGrace = touchGrace
         self.clock = clock
+    }
+
+    /// The screen was just touched: the burst about to reach the
+    /// microphone is the finger, not the speaker. A hold already in
+    /// progress keeps resolving on its own evidence.
+    func noteScreenTouch() {
+        let until = clock.now + touchGrace
+        state.withLock { state in
+            if !state.disposed {
+                state.touchSuppressedUntil = until
+            }
+        }
     }
 
     /// Called by the service after every microphone chunk it accepted.
@@ -57,6 +80,16 @@ final class ConversationBargeIn: @unchecked Sendable {
             }
             return
         }
+        let now = clock.now
+        let (holdSuppressed, touched) = state.withLock { state in
+            (
+                state.holdSuppressedUntil.map { now < $0 } ?? false,
+                state.touchSuppressedUntil.map { now < $0 } ?? false,
+            )
+        }
+        if touched {
+            return
+        }
         if voiceActivity.userInterrupting {
             // Reached without a hold only while holds rest after a
             // false alarm; sustained speech still cuts the
@@ -64,11 +97,7 @@ final class ConversationBargeIn: @unchecked Sendable {
             commitInterruption()
             return
         }
-        let now = clock.now
-        let suppressed = state.withLock { state in
-            state.holdSuppressedUntil.map { now < $0 } ?? false
-        }
-        if voiceActivity.userMaybeInterrupting, !suppressed,
+        if voiceActivity.userMaybeInterrupting, !holdSuppressed,
            playback.holdTurn()
         {
             onProtocolEvent("assistant_playback_held")

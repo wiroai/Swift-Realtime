@@ -16,6 +16,7 @@ final class FakeConversationSessionController:
     var stopCalls = 0
     var disposeCalls = 0
     var interruptCalls = 0
+    var screenTouchCalls = 0
     var suspendCalls = 0
     var resumeCalls = 0
     var openSettingsCalls = 0
@@ -67,6 +68,10 @@ final class FakeConversationSessionController:
 
     func interruptAssistant() {
         interruptCalls += 1
+    }
+
+    func noteScreenTouch() {
+        screenTouchCalls += 1
     }
 
     func openSystemSettings() async {

@@ -305,6 +305,15 @@ final class SpeechToSpeechSessionService:
         }
     }
 
+    func noteScreenTouch() {
+        if operationGuard.isDisposed
+            || snapshot.sessionState != .streaming
+        {
+            return
+        }
+        turnTaking.noteScreenTouch()
+    }
+
     func openSystemSettings() async {
         if operationGuard.isDisposed {
             return

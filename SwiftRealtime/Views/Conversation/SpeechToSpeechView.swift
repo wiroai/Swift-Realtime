@@ -60,6 +60,7 @@ struct SpeechToSpeechView: View {
         .sensoryFeedback(trigger: isLive) { _, live in
             live ? .start : .stop
         }
+        .onScreenTouch { model.noteScreenTouch() }
         .accessibilityIdentifier(
             isVisible ? "conversation-visible" : "conversation-hidden",
         )

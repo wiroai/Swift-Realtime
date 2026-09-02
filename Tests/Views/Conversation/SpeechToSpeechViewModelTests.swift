@@ -18,6 +18,23 @@ final class SpeechToSpeechViewModelTests: XCTestCase {
         await viewModel.dispose()
     }
 
+    func testScreenTouchesReachTheSessionOnlyWhileLive() async {
+        let controller = FakeConversationSessionController()
+        let viewModel = SpeechToSpeechViewModel(
+            sessionService: controller,
+        )
+        viewModel.noteScreenTouch()
+        XCTAssertEqual(controller.screenTouchCalls, 0)
+
+        controller.publish(
+            ConversationSessionSnapshot(sessionState: .streaming),
+        )
+        await waitFor(viewModel) { $0.sessionState == .streaming }
+        viewModel.noteScreenTouch()
+        XCTAssertEqual(controller.screenTouchCalls, 1)
+        await viewModel.dispose()
+    }
+
     func testProjectsOntoViewStateWhatTheScreenDraws() async {
         let harness = makeHarness()
 
