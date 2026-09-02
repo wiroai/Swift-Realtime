@@ -33,23 +33,29 @@ struct SpeechToTextView: View {
     var body: some View {
         NavigationStack {
             stageContent
-                .navigationTitle(TranscriptionCopy.emptyTitle)
+                .navigationTitle(TranscriptionCopy.title)
                 .navigationBarTitleDisplayMode(.large)
                 .navigationSubtitle(subtitle)
                 .toolbar { toolbarContent }
                 .alert(
                     SystemSettingsCopy.alertTitle,
-                    isPresented: settingsAlertPresented,
+                    isPresented: .dismissal(
+                        isPresented: model.state.showsSystemSettingsAlert,
+                        onDismiss: model.dismissSystemSettingsAlert,
+                    ),
                 ) {
                     Button(SystemSettingsCopy.open) {
                         Task { await model.openSystemSettings() }
                     }
-                    Button("OK", role: .cancel) {}
+                    Button(SharedCopy.ok, role: .cancel) {}
                 } message: {
                     if let message = model.state.errorMessage {
                         Text(message)
                     }
                 }
+        }
+        .sensoryFeedback(trigger: model.state.isLive) { _, live in
+            live ? .start : .stop
         }
         .accessibilityIdentifier(
             isVisible
@@ -73,18 +79,13 @@ struct SpeechToTextView: View {
         if model.state.showsConnecting {
             ContentUnavailableView {
                 ProgressView()
-            } description: {
-                Text(connectingCaption)
             }
         } else if model.state.sessionState == .failure,
                   let message = model.state.errorMessage,
                   model.state.transcript.isEmpty
         {
             ContentUnavailableView {
-                Label(
-                    message,
-                    systemImage: "exclamationmark.triangle",
-                )
+                Label(message, systemImage: "exclamationmark.triangle")
             } description: {
                 EmptyView()
             } actions: {
@@ -92,53 +93,57 @@ struct SpeechToTextView: View {
                     Button(SystemSettingsCopy.open) {
                         Task { await model.openSystemSettings() }
                     }
-                    .accessibilityIdentifier(
-                        "open-settings-control",
-                    )
+                    .accessibilityIdentifier("open-settings-control")
                 }
             }
         } else if !model.state.transcript.isEmpty {
-            ScrollViewReader { proxy in
-                List {
-                    if model.state.sessionState == .failure,
-                       let message = model.state.errorMessage
-                    {
-                        Section {
-                            Label(
-                                message,
-                                systemImage: "exclamationmark.triangle",
-                            )
-                            if model.state.canOpenSystemSettings {
-                                Button(SystemSettingsCopy.open) {
-                                    Task {
-                                        await model.openSystemSettings()
-                                    }
-                                }
-                                .accessibilityIdentifier(
-                                    "open-settings-control",
-                                )
+            transcriptList
+        } else if model.state.isLive {
+            ContentUnavailableView(
+                model.state.muted
+                    ? TranscriptionCopy.muted
+                    : TranscriptionCopy.listening,
+                systemImage: model.state.muted ? "mic.slash" : "waveform",
+            )
+        } else {
+            ContentUnavailableView {
+                Image(systemName: "text.quote")
+                    .font(.system(size: 56))
+                    .foregroundStyle(.tertiary)
+            }
+        }
+    }
+
+    private var transcriptList: some View {
+        ScrollViewReader { proxy in
+            List {
+                if model.state.sessionState == .failure,
+                   let message = model.state.errorMessage
+                {
+                    Section {
+                        Label(
+                            message,
+                            systemImage: "exclamationmark.triangle",
+                        )
+                        if model.state.canOpenSystemSettings {
+                            Button(SystemSettingsCopy.open) {
+                                Task { await model.openSystemSettings() }
                             }
+                            .accessibilityIdentifier(
+                                "open-settings-control",
+                            )
                         }
                     }
-                    Section {
-                        Text(model.state.transcript)
-                            .textSelection(.enabled)
-                            .id("transcript-end")
-                    }
                 }
-                .onChange(of: model.state.transcript) { _, _ in
-                    proxy.scrollTo(
-                        "transcript-end",
-                        anchor: .bottom,
-                    )
+                Section {
+                    Text(model.state.transcript)
+                        .textSelection(.enabled)
+                        .id("transcript-end")
                 }
             }
-        } else {
-            ContentUnavailableView(
-                TranscriptionCopy.emptyTitle,
-                systemImage: "waveform",
-                description: Text(TranscriptionCopy.emptyDetail),
-            )
+            .onChange(of: model.state.transcript) { _, _ in
+                proxy.scrollTo("transcript-end", anchor: .bottom)
+            }
         }
     }
 
@@ -154,8 +159,10 @@ struct SpeechToTextView: View {
         ToolbarItem(placement: .primaryAction) {
             primaryControl
         }
-        ToolbarItem(placement: .automatic) {
-            accuracyMenu
+        if model.canChangeAccuracy {
+            ToolbarItem(placement: .automatic) {
+                accuracyMenu
+            }
         }
         if model.state.isLive {
             ToolbarItem(placement: .automatic) {
@@ -165,7 +172,7 @@ struct SpeechToTextView: View {
                         : TranscriptionCopy.mute,
                     systemImage: model.state.muted
                         ? "mic.slash.fill"
-                        : "mic.fill",
+                        : "mic",
                 ) {
                     model.setMuted(!model.state.muted)
                 }
@@ -173,48 +180,9 @@ struct SpeechToTextView: View {
         }
         if !model.state.transcript.isEmpty {
             ToolbarItem(placement: .automatic) {
-                Button(
-                    TranscriptionCopy.copy,
-                    systemImage: "doc.on.doc",
-                ) {
-                    UIPasteboard.general.string =
-                        model.state.transcript
-                }
-                .accessibilityIdentifier("copy-transcript")
+                transcriptMenu
             }
         }
-        if model.state.canClearTranscript {
-            ToolbarItem(placement: .automatic) {
-                Button(
-                    TranscriptionCopy.clear,
-                    systemImage: "trash",
-                ) {
-                    model.clearTranscript()
-                }
-            }
-        }
-        if model.state.canOpenSystemSettings {
-            ToolbarItem(placement: .automatic) {
-                Button(
-                    SystemSettingsCopy.open,
-                    systemImage: "mic.slash.circle",
-                ) {
-                    Task { await model.openSystemSettings() }
-                }
-                .accessibilityIdentifier("open-settings-control")
-            }
-        }
-    }
-
-    private var settingsAlertPresented: Binding<Bool> {
-        Binding(
-            get: { model.state.showsSystemSettingsAlert },
-            set: { presented in
-                if !presented {
-                    model.dismissSystemSettingsAlert()
-                }
-            },
-        )
     }
 
     @ViewBuilder
@@ -222,39 +190,58 @@ struct SpeechToTextView: View {
         if model.state.showsConnecting {
             ProgressView()
         } else if model.state.isLive || model.state.isEnding {
-            Button(
-                TranscriptionCopy.stop,
-                systemImage: "stop.fill",
-            ) {
+            Button(TranscriptionCopy.stop) {
                 Task { await model.stop() }
             }
+            .buttonStyle(.glassProminent)
             .disabled(model.state.isEnding)
         } else {
-            Button(
-                TranscriptionCopy.start,
-                systemImage: "mic.fill",
-            ) {
+            Button(TranscriptionCopy.start) {
                 Task { await model.start() }
             }
+            .buttonStyle(.glassProminent)
             .disabled(!model.canStart)
         }
     }
 
     private var accuracyMenu: some View {
         Menu {
-            ForEach(accuracyOptions, id: \.self) { option in
-                Button(TranscriptionFields.displayName(option)) {
-                    model.selectAccuracy(option)
+            Picker(TranscriptionCopy.accuracy, selection: accuracySelection) {
+                ForEach(accuracyOptions, id: \.self) { option in
+                    Text(OptionTitle.capitalized(option)).tag(option)
                 }
             }
         } label: {
-            Label(
-                TranscriptionFields.displayName(model.accuracy),
-                systemImage: "gauge.with.needle",
-            )
+            Text(OptionTitle.capitalized(model.accuracy))
         }
-        .disabled(!model.canChangeAccuracy)
+        .accessibilityLabel(TranscriptionCopy.accuracy)
+        .accessibilityValue(OptionTitle.capitalized(model.accuracy))
         .accessibilityIdentifier("field-transcriptionDelay")
+    }
+
+    private var transcriptMenu: some View {
+        Menu(TranscriptionCopy.more, systemImage: "ellipsis.circle") {
+            Button(TranscriptionCopy.copy, systemImage: "doc.on.doc") {
+                UIPasteboard.general.string = model.state.transcript
+            }
+            .accessibilityIdentifier("copy-transcript")
+            if model.state.canClearTranscript {
+                Button(
+                    TranscriptionCopy.clear,
+                    systemImage: "trash",
+                    role: .destructive,
+                ) {
+                    model.clearTranscript()
+                }
+            }
+        }
+    }
+
+    private var accuracySelection: Binding<String> {
+        Binding(
+            get: { model.accuracy },
+            set: { model.selectAccuracy($0) },
+        )
     }
 
     private var accuracyOptions: [String] {
@@ -262,26 +249,9 @@ struct SpeechToTextView: View {
             .options.map(\.value) ?? []
     }
 
-    private var connectingCaption: String {
-        TranscriptionConnectProgress.caption(
-            for: model.state.sessionState,
-        ) ?? TranscriptionCopy.connecting
-    }
-
     private var subtitle: String {
-        if model.state.showsConnecting || model.state.isEnding {
-            return connectingCaption
-        }
-        if model.state.isLive {
-            return formatElapsed(model.state.elapsed)
-        }
-        return TranscriptionFields.displayName(model.accuracy)
+        model.state.isLive || model.state.isEnding
+            ? model.state.elapsed.clockText
+            : ""
     }
-}
-
-private func formatElapsed(_ elapsed: Duration) -> String {
-    let seconds = Int(elapsed.components.seconds)
-    let minutes = seconds / 60
-    let remainder = seconds % 60
-    return String(format: "%d:%02d", minutes, remainder)
 }

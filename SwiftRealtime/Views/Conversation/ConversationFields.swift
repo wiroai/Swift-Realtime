@@ -15,11 +15,4 @@ enum ConversationFields {
             field.id != voiceId && field.id != instructionsId
         }
     }
-
-    static func displayName(_ value: String) -> String {
-        guard let first = value.first else {
-            return value
-        }
-        return String(first).uppercased() + value.dropFirst()
-    }
 }

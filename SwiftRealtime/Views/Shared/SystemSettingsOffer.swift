@@ -8,7 +8,8 @@ enum SystemSettingsCopy {
 }
 
 /// First time a permanent microphone denial appears, the screen
-/// raises an alert. Dismissing it leaves the toolbar item.
+/// raises an alert. Dismissing it leaves the button under the
+/// failure line on the stage.
 struct SystemSettingsOffer: Equatable, Sendable {
     private(set) var canOpen = false
     private(set) var showsAlert = false

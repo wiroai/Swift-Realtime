@@ -1,14 +1,10 @@
 import SwiftUI
 
-enum AppTheme {
-    static let preferredColorScheme = ColorScheme.light
-}
-
+/// The app follows the system appearance. Everything on screen is a
+/// system control, so light and dark both come from the OS.
 private struct AppAppearance: ViewModifier {
     func body(content: Content) -> some View {
-        content
-            .tint(AppColors.green)
-            .preferredColorScheme(AppTheme.preferredColorScheme)
+        content.tint(AppColors.green)
     }
 }
 

@@ -33,7 +33,7 @@ struct SpeechToSpeechView: View {
     var body: some View {
         NavigationStack {
             stageContent
-                .navigationTitle(ConversationCopy.emptyTitle)
+                .navigationTitle(ConversationCopy.title)
                 .navigationBarTitleDisplayMode(.large)
                 .navigationSubtitle(subtitle)
                 .toolbar { toolbarContent }
@@ -42,17 +42,23 @@ struct SpeechToSpeechView: View {
                 }
                 .alert(
                     SystemSettingsCopy.alertTitle,
-                    isPresented: settingsAlertPresented,
+                    isPresented: .dismissal(
+                        isPresented: model.state.showsSystemSettingsAlert,
+                        onDismiss: model.dismissSystemSettingsAlert,
+                    ),
                 ) {
                     Button(SystemSettingsCopy.open) {
                         Task { await model.openSystemSettings() }
                     }
-                    Button("OK", role: .cancel) {}
+                    Button(SharedCopy.ok, role: .cancel) {}
                 } message: {
                     if let message = model.state.errorMessage {
                         Text(message)
                     }
                 }
+        }
+        .sensoryFeedback(trigger: isLive) { _, live in
+            live ? .start : .stop
         }
         .accessibilityIdentifier(
             isVisible ? "conversation-visible" : "conversation-hidden",
@@ -86,17 +92,12 @@ struct SpeechToSpeechView: View {
         if model.state.showsConnecting {
             ContentUnavailableView {
                 ProgressView()
-            } description: {
-                Text(connectingCaption)
             }
         } else if model.displayedStage == .failed,
                   let message = model.state.errorMessage
         {
             ContentUnavailableView {
-                Label(
-                    message,
-                    systemImage: "exclamationmark.triangle",
-                )
+                Label(message, systemImage: "exclamationmark.triangle")
             } description: {
                 EmptyView()
             } actions: {
@@ -104,30 +105,47 @@ struct SpeechToSpeechView: View {
                     Button(SystemSettingsCopy.open) {
                         Task { await model.openSystemSettings() }
                     }
-                    .accessibilityIdentifier(
-                        "open-settings-control",
-                    )
+                    .accessibilityIdentifier("open-settings-control")
                 }
             }
         } else if hasTranscripts {
+            transcriptList
+        } else if isLive {
+            ContentUnavailableView(
+                model.state.muted
+                    ? ConversationCopy.muted
+                    : ConversationCopy.listening,
+                systemImage: model.state.muted ? "mic.slash" : "waveform",
+            )
+        } else {
+            ContentUnavailableView {
+                Image(systemName: "bubble.left.and.bubble.right")
+                    .font(.system(size: 56))
+                    .foregroundStyle(.tertiary)
+            }
+        }
+    }
+
+    private var transcriptList: some View {
+        ScrollViewReader { proxy in
             List {
                 if !model.state.userTranscript.isEmpty {
                     Section(ConversationCopy.you) {
                         Text(model.state.userTranscript)
+                            .textSelection(.enabled)
                     }
                 }
                 if !model.state.aiTranscript.isEmpty {
                     Section(ConversationCopy.assistant) {
                         Text(model.state.aiTranscript)
+                            .textSelection(.enabled)
+                            .id("assistant-end")
                     }
                 }
             }
-        } else {
-            ContentUnavailableView(
-                ConversationCopy.emptyTitle,
-                systemImage: "bubble.left.and.bubble.right",
-                description: Text(ConversationCopy.emptyDetail),
-            )
+            .onChange(of: model.state.aiTranscript) { _, _ in
+                proxy.scrollTo("assistant-end", anchor: .bottom)
+            }
         }
     }
 
@@ -146,7 +164,7 @@ struct SpeechToSpeechView: View {
         ToolbarItem(placement: .automatic) {
             voiceMenu
         }
-        if model.displayedStage == .live {
+        if isLive {
             ToolbarItem(placement: .automatic) {
                 Button(
                     model.state.muted
@@ -154,7 +172,7 @@ struct SpeechToSpeechView: View {
                         : ConversationCopy.mute,
                     systemImage: model.state.muted
                         ? "mic.slash.fill"
-                        : "mic.fill",
+                        : "mic",
                 ) {
                     model.setMuted(!model.state.muted)
                 }
@@ -168,23 +186,14 @@ struct SpeechToSpeechView: View {
                 }
             }
         }
-        ToolbarItem(placement: .automatic) {
-            Button(
-                ConversationCopy.settings,
-                systemImage: "gearshape",
-            ) {
-                showsSettings = true
-            }
-        }
-        if model.state.canOpenSystemSettings {
+        if canEditSettings {
             ToolbarItem(placement: .automatic) {
                 Button(
-                    SystemSettingsCopy.open,
-                    systemImage: "mic.slash.circle",
+                    ConversationCopy.settings,
+                    systemImage: "gearshape",
                 ) {
-                    Task { await model.openSystemSettings() }
+                    showsSettings = true
                 }
-                .accessibilityIdentifier("open-settings-control")
             }
         }
     }
@@ -193,42 +202,42 @@ struct SpeechToSpeechView: View {
     private var primaryControl: some View {
         if model.state.showsConnecting {
             ProgressView()
-        } else if model.displayedStage == .live
-            || model.displayedStage == .ending
-        {
-            Button(
-                ConversationCopy.stop,
-                systemImage: "stop.fill",
-            ) {
+        } else if isLive || model.displayedStage == .ending {
+            Button(ConversationCopy.stop) {
                 Task { await model.stop() }
             }
+            .buttonStyle(.glassProminent)
             .disabled(model.displayedStage == .ending)
         } else {
-            Button(
-                ConversationCopy.start,
-                systemImage: "mic.fill",
-            ) {
+            Button(ConversationCopy.start) {
                 Task { await model.start() }
             }
+            .buttonStyle(.glassProminent)
             .disabled(!model.canStart)
         }
     }
 
     private var voiceMenu: some View {
         Menu {
-            ForEach(voiceOptions, id: \.self) { option in
-                Button(ConversationFields.displayName(option)) {
-                    Task { await model.selectVoice(option) }
+            Picker(ConversationCopy.voice, selection: voiceSelection) {
+                ForEach(voiceOptions, id: \.self) { option in
+                    Text(OptionTitle.capitalized(option)).tag(option)
                 }
             }
         } label: {
-            Label(
-                ConversationFields.displayName(model.voice),
-                systemImage: "waveform",
-            )
+            Text(OptionTitle.capitalized(model.voice))
         }
         .disabled(!model.canChangeVoice)
+        .accessibilityLabel(ConversationCopy.voice)
+        .accessibilityValue(OptionTitle.capitalized(model.voice))
         .accessibilityIdentifier("field-voice")
+    }
+
+    private var voiceSelection: Binding<String> {
+        Binding(
+            get: { model.voice },
+            set: { voice in Task { await model.selectVoice(voice) } },
+        )
     }
 
     private var voiceOptions: [String] {
@@ -236,33 +245,19 @@ struct SpeechToSpeechView: View {
             .options.map(\.value) ?? []
     }
 
-    private var settingsAlertPresented: Binding<Bool> {
-        Binding(
-            get: { model.state.showsSystemSettingsAlert },
-            set: { presented in
-                if !presented {
-                    model.dismissSystemSettingsAlert()
-                }
-            },
-        )
-    }
-
-    private var connectingCaption: String {
-        ConversationConnectProgress.caption(
-            for: model.state.sessionState,
-        ) ?? ConversationCopy.connecting
-    }
-
     private var subtitle: String {
-        if model.state.showsConnecting {
-            return connectingCaption
-        }
-        if model.displayedStage == .live
-            || model.displayedStage == .ending
-        {
-            return formatElapsed(model.state.elapsed)
-        }
-        return ConversationFields.displayName(model.voice)
+        isLive || model.displayedStage == .ending
+            ? model.state.elapsed.clockText
+            : ""
+    }
+
+    private var isLive: Bool {
+        model.displayedStage == .live
+    }
+
+    private var canEditSettings: Bool {
+        model.displayedStage == .ready
+            || model.displayedStage == .failed
     }
 
     private var hasTranscripts: Bool {
@@ -284,13 +279,13 @@ struct ConversationSettingsView: View {
                     ),
                     value: { model.parameters.value(for: $0) ?? "" },
                     setValue: { model.setParameter($0, for: $1) },
-                    optionTitle: ConversationFields.displayName,
+                    optionTitle: OptionTitle.capitalized,
                 )
             }
             .navigationTitle(ConversationCopy.settings)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
+                    Button(SharedCopy.done) { dismiss() }
                 }
             }
             .disabled(!canEditSettings)
@@ -301,11 +296,4 @@ struct ConversationSettingsView: View {
         model.displayedStage == .ready
             || model.displayedStage == .failed
     }
-}
-
-private func formatElapsed(_ elapsed: Duration) -> String {
-    let seconds = Int(elapsed.components.seconds)
-    let minutes = seconds / 60
-    let remainder = seconds % 60
-    return String(format: "%d:%02d", minutes, remainder)
 }

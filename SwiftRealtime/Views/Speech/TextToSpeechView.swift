@@ -8,6 +8,7 @@ struct TextToSpeechView: View {
 
     @State private var model: TextToSpeechViewModel
     @State private var showsSettings = false
+    @FocusState private var promptFocused: Bool
     @Environment(\.scenePhase) private var scenePhase
 
     init(
@@ -31,10 +32,9 @@ struct TextToSpeechView: View {
     }
 
     var body: some View {
-        @Bindable var model = model
         NavigationStack {
             stageContent
-                .navigationTitle(SpeechCopy.destinationTitle)
+                .navigationTitle(SpeechCopy.title)
                 .navigationBarTitleDisplayMode(.large)
                 .navigationSubtitle(subtitle)
                 .toolbar { toolbarContent }
@@ -42,7 +42,9 @@ struct TextToSpeechView: View {
                     SpeechSettingsView(model: model)
                 }
         }
-        .scrollDismissesKeyboard(.interactively)
+        .sensoryFeedback(trigger: model.state.isLive) { _, live in
+            live ? .start : .stop
+        }
         .accessibilityIdentifier(
             isVisible ? "speech-visible" : "speech-hidden",
         )
@@ -64,42 +66,31 @@ struct TextToSpeechView: View {
 
     private var stageContent: some View {
         @Bindable var model = model
-        return VStack(alignment: .leading, spacing: 12) {
+        return Form {
             if let message = model.state.errorMessage {
-                Label(
-                    message,
-                    systemImage: "exclamationmark.triangle",
-                )
-            }
-            TextEditor(text: $model.prompt)
-                .font(.body)
-                .scrollContentBackground(.hidden)
-                .disabled(!model.state.canEditPrompt)
-                .id(model.state.selectedModel.modelSlug)
-                .overlay(alignment: .topLeading) {
-                    if model.prompt.isEmpty {
-                        Text(SpeechCopy.promptHint)
-                            .foregroundStyle(.secondary)
-                            .padding(.top, 8)
-                            .padding(.leading, 5)
-                            .allowsHitTesting(false)
-                    }
+                Section {
+                    Label(message, systemImage: "exclamationmark.triangle")
                 }
-                .accessibilityIdentifier("tts-prompt")
-            if !model.prompt.isEmpty {
-                Text(SpeechCopy.characterCount(model.prompt.count))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .trailing)
-                    .accessibilityIdentifier("tts-character-count")
             }
-            if model.state.showsConnecting || model.state.isEnding {
-                ProgressView()
-                    .frame(maxWidth: .infinity)
+            Section {
+                TextField(
+                    SpeechCopy.promptPlaceholder,
+                    text: $model.prompt,
+                    axis: .vertical,
+                )
+                .lineLimit(8...)
+                .focused($promptFocused)
+                .disabled(!model.state.canEditPrompt)
+                .accessibilityIdentifier("tts-prompt")
+            } footer: {
+                if !model.prompt.isEmpty {
+                    Text(SpeechCopy.characterCount(model.prompt.count))
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                        .accessibilityIdentifier("tts-character-count")
+                }
             }
         }
-        .padding()
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .scrollDismissesKeyboard(.interactively)
     }
 
     @ToolbarContentBuilder
@@ -114,20 +105,27 @@ struct TextToSpeechView: View {
         ToolbarItem(placement: .primaryAction) {
             primaryControl
         }
-        ToolbarItem(placement: .automatic) {
-            modelMenu
-        }
-        if !SpeechFields.settingsFields(
-            in: model.state.selectedModel,
-        ).isEmpty {
+        if model.canChangeModel {
             ToolbarItem(placement: .automatic) {
-                Button(
-                    SpeechCopy.settings,
-                    systemImage: "gearshape",
-                ) {
-                    showsSettings = true
+                modelMenu
+            }
+            if !SpeechFields.settingsFields(
+                in: model.state.selectedModel,
+            ).isEmpty {
+                ToolbarItem(placement: .automatic) {
+                    Button(
+                        SpeechCopy.settings,
+                        systemImage: "gearshape",
+                    ) {
+                        showsSettings = true
+                    }
                 }
-                .disabled(!model.canChangeModel)
+            }
+        }
+        if promptFocused {
+            ToolbarItem(placement: .keyboard) {
+                Button(SharedCopy.done) { promptFocused = false }
+                    .frame(maxWidth: .infinity, alignment: .trailing)
             }
         }
     }
@@ -137,50 +135,53 @@ struct TextToSpeechView: View {
         if model.state.showsConnecting {
             ProgressView()
         } else if model.state.isLive || model.state.isEnding {
-            Button(SpeechCopy.stop, systemImage: "stop.fill") {
+            Button(SpeechCopy.stop) {
                 Task { await model.stop() }
             }
+            .buttonStyle(.glassProminent)
             .disabled(model.state.isEnding)
-            .accessibilityLabel(SpeechCopy.stop)
         } else {
-            Button(SpeechCopy.play, systemImage: "play.fill") {
+            Button(SpeechCopy.play) {
+                promptFocused = false
                 Task { await model.start() }
             }
-            .disabled(!model.canStart)
-            .accessibilityLabel(SpeechCopy.play)
+            .buttonStyle(.glassProminent)
+            .disabled(!model.canStart || model.prompt.isEmpty)
         }
     }
 
     private var modelMenu: some View {
         Menu {
-            ForEach(SpeechFields.models, id: \.modelSlug) { option in
-                Button(option.displayName) {
-                    model.selectModel(option)
+            Picker(SpeechCopy.model, selection: modelSelection) {
+                ForEach(SpeechFields.models, id: \.modelSlug) { option in
+                    Text(option.displayName).tag(option.modelSlug)
                 }
             }
         } label: {
-            Label(
-                model.state.selectedModel.displayName,
-                systemImage: "waveform",
-            )
+            Text(model.state.selectedModel.displayName)
         }
-        .disabled(!model.canChangeModel)
-        .accessibilityIdentifier("tts-model-selector")
         .accessibilityLabel(SpeechCopy.model)
+        .accessibilityValue(model.state.selectedModel.displayName)
+        .accessibilityIdentifier("tts-model-selector")
+    }
+
+    private var modelSelection: Binding<String> {
+        Binding(
+            get: { model.state.selectedModel.modelSlug },
+            set: { slug in
+                if let option = SpeechFields.models.first(
+                    where: { $0.modelSlug == slug },
+                ) {
+                    model.selectModel(option)
+                }
+            },
+        )
     }
 
     private var subtitle: String {
-        if let caption = SpeechConnectProgress.caption(
-            for: model.state.sessionState,
-            isPlaying: model.state.isPlaying,
-        ) {
-            if model.state.isLive {
-                return "\(formatElapsed(model.state.elapsed)) · "
-                    + caption
-            }
-            return caption
-        }
-        return model.state.selectedModel.displayName
+        model.state.isLive || model.state.isEnding
+            ? model.state.elapsed.clockText
+            : ""
     }
 }
 
@@ -202,17 +203,10 @@ struct SpeechSettingsView: View {
             .navigationTitle(SpeechCopy.settings)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
+                    Button(SharedCopy.done) { dismiss() }
                 }
             }
             .disabled(!model.canChangeModel)
         }
     }
-}
-
-private func formatElapsed(_ elapsed: Duration) -> String {
-    let seconds = Int(elapsed.components.seconds)
-    let minutes = seconds / 60
-    let remainder = seconds % 60
-    return String(format: "%d:%02d", minutes, remainder)
 }

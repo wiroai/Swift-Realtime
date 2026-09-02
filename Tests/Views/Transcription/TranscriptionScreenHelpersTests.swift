@@ -2,31 +2,6 @@ import XCTest
 @testable import SwiftRealtime
 
 final class TranscriptionScreenHelpersTests: XCTestCase {
-    func testConnectCaptionsNameTheWaitThePersonIsIn() {
-        XCTAssertEqual(
-            TranscriptionConnectProgress.caption(
-                for: .requestingPermission,
-            ),
-            TranscriptionCopy.connectingPermission,
-        )
-        XCTAssertEqual(
-            TranscriptionConnectProgress.caption(
-                for: .creatingTask,
-            ),
-            TranscriptionCopy.startingTask,
-        )
-        XCTAssertEqual(
-            TranscriptionConnectProgress.caption(for: .stopping),
-            TranscriptionCopy.finishing,
-        )
-        XCTAssertNil(
-            TranscriptionConnectProgress.caption(for: .streaming),
-        )
-        XCTAssertNil(
-            TranscriptionConnectProgress.caption(for: .idle),
-        )
-    }
-
     func testConnectingIsOnlyTheWaitBetweenTapAndStream() {
         var state = SpeechToTextState(
             sessionState: .creatingTask,
@@ -55,15 +30,12 @@ final class TranscriptionScreenHelpersTests: XCTestCase {
         XCTAssertFalse(state.canClearTranscript)
     }
 
-    func testCopyActionIsTheDartWording() {
-        XCTAssertEqual(TranscriptionCopy.copy, "Copy")
-    }
-
-    func testDisplayNameCapitalizesTheFirstLetter() {
+    func testDelayFieldComesFromTheCatalog() {
         XCTAssertEqual(
-            TranscriptionFields.displayName("balanced"),
-            "Balanced",
+            TranscriptionFields.delay(
+                in: WiroModelCatalog.voxtralMiniRealtime,
+            )?.id,
+            TranscriptionFields.delayId,
         )
-        XCTAssertEqual(TranscriptionFields.displayName(""), "")
     }
 }

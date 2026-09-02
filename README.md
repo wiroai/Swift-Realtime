@@ -46,8 +46,10 @@ live Wiro model over one WebSocket protocol:
 </div>
 
 The chrome is system SwiftUI: `TabView`, `NavigationStack`, toolbar
-items, `Menu`, `Form`, `List`. Liquid Glass comes from iOS 26. There
-is no custom orb, wave, or tab bar.
+items, `Menu`, `Form`, `List`. Liquid Glass comes from iOS 26, light
+and dark follow the system, and there is no custom orb, wave, or tab
+bar. The screens carry no instructions: Start is the one prominent
+button, and the stage shows what is happening, not what to do.
 
 ## Features
 

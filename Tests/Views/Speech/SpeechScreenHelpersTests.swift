@@ -2,43 +2,6 @@ import XCTest
 @testable import SwiftRealtime
 
 final class SpeechScreenHelpersTests: XCTestCase {
-    func testConnectCaptionsNameTheWaitThePersonIsIn() {
-        XCTAssertEqual(
-            SpeechConnectProgress.caption(
-                for: .creatingTask,
-                isPlaying: false,
-            ),
-            SpeechCopy.startingTask,
-        )
-        XCTAssertEqual(
-            SpeechConnectProgress.caption(
-                for: .streaming,
-                isPlaying: false,
-            ),
-            SpeechCopy.buffering,
-        )
-        XCTAssertEqual(
-            SpeechConnectProgress.caption(
-                for: .streaming,
-                isPlaying: true,
-            ),
-            SpeechCopy.speaking,
-        )
-        XCTAssertEqual(
-            SpeechConnectProgress.caption(
-                for: .stopping,
-                isPlaying: false,
-            ),
-            SpeechCopy.finishing,
-        )
-        XCTAssertNil(
-            SpeechConnectProgress.caption(
-                for: .idle,
-                isPlaying: false,
-            ),
-        )
-    }
-
     func testConnectingIsOnlyTheWaitBetweenTapAndStream() {
         var state = TextToSpeechState(
             selectedModel: WiroModelCatalog.mossTtsRealtime,
