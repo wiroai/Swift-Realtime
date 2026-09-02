@@ -91,6 +91,9 @@ struct TextToSpeechView: View {
             }
         }
         .scrollDismissesKeyboard(.interactively)
+        // The field keeps its own tap; anywhere else on the form ends
+        // editing.
+        .onTapGesture { promptFocused = false }
     }
 
     @ToolbarContentBuilder
