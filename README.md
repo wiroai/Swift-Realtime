@@ -253,7 +253,10 @@ simulator plus `swiftformat --lint`, `swiftlint --strict`, and an
 
 - [Wiro documentation](https://wiro.ai/docs)
 - [Available models](https://wiro.ai/models)
-- [Dart counterpart](https://github.com/wiro-ai/Dart-Realtime)
+- Same example on other platforms:
+  [Dart / Flutter](https://github.com/wiroai/Dart-Realtime) ·
+  [Kotlin](https://github.com/wiroai/Kotlin-Realtime) ·
+  [React Native](https://github.com/wiroai/ReactNative-Realtime)
 
 ## License
 
