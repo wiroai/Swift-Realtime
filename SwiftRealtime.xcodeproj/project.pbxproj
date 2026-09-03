@@ -260,7 +260,6 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = A4Z67937SY;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Configs/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Wiro Realtime";
@@ -289,7 +288,6 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = A4Z67937SY;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Configs/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Wiro Realtime";

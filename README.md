@@ -74,6 +74,9 @@ button, and the stage shows what is happening, not what to do.
 - Xcode 26 or later
 - A **physical** iPhone on iOS 26 — the simulator microphone is not
   a usable voice path
+- An Apple Developer team for signing on that iPhone — set
+  `DEVELOPMENT_TEAM` in `Configs/Secrets.xcconfig` (see below);
+  the project file ships without one
 - A [Wiro project and API key](https://wiro.ai/panel/project/new)
 
 No CocoaPods. The project is a single Xcode folder-synced target.
@@ -91,10 +94,13 @@ Edit `Configs/Secrets.xcconfig`:
 ```
 WIRO_API_KEY = YOUR_API_KEY
 WIRO_API_SECRET =
+DEVELOPMENT_TEAM = YOUR_TEAM_ID
 ```
 
 `WIRO_API_SECRET` is only for signature-based Wiro projects. Leave
-it empty for API-key-only projects. The secrets file is gitignored.
+it empty for API-key-only projects. `DEVELOPMENT_TEAM` is the
+ten-character id from your Apple Developer account; the simulator
+builds without it. The secrets file is gitignored.
 
 Then:
 
@@ -264,7 +270,8 @@ Time-dependent code takes a `RealtimeClock`; tests drive a
 
 CI (`.github/workflows/tests.yml`) runs the suite on an iOS 26
 simulator plus `swiftformat --lint`, `swiftlint --strict`, and an
-80-column check. See [`CONTRIBUTING.md`](CONTRIBUTING.md).
+80-column check. See [`CONTRIBUTING.md`](CONTRIBUTING.md). Security
+problems go to [`SECURITY.md`](SECURITY.md), not to a public issue.
 
 ## Documentation
 
