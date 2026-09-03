@@ -64,8 +64,46 @@ struct SpeechToTextView: View {
         }
     }
 
-    @ViewBuilder
+    /// The list is always the root: the large title and its subtitle
+    /// follow the root's scroll geometry, and a stage that only
+    /// overlays it cannot shift the title when the subtitle appears.
     private var stageContent: some View {
+        ScrollViewReader { proxy in
+            List {
+                if showsTranscript {
+                    transcriptSections
+                }
+            }
+            .onChange(of: model.state.transcript) { _, _ in
+                proxy.scrollTo("transcript-end", anchor: .bottom)
+            }
+        }
+        .overlay { emptyStage }
+    }
+
+    @ViewBuilder
+    private var transcriptSections: some View {
+        if model.state.sessionState == .failure,
+           let message = model.state.errorMessage
+        {
+            Section {
+                Label(message, systemImage: "exclamationmark.triangle")
+                if model.state.canOpenSystemSettings {
+                    OpenSettingsButton(
+                        openSettings: model.openSystemSettings,
+                    )
+                }
+            }
+        }
+        Section {
+            Text(model.state.transcript)
+                .textSelection(.enabled)
+                .id("transcript-end")
+        }
+    }
+
+    @ViewBuilder
+    private var emptyStage: some View {
         if model.state.showsConnecting {
             SessionStage.connecting
         } else if model.state.sessionState == .failure,
@@ -77,8 +115,8 @@ struct SpeechToTextView: View {
                 canOpenSettings: model.state.canOpenSystemSettings,
                 openSettings: model.openSystemSettings,
             )
-        } else if !model.state.transcript.isEmpty {
-            transcriptList
+        } else if showsTranscript {
+            EmptyView()
         } else if model.state.isLive {
             SessionStage.listening(muted: model.state.muted)
         } else {
@@ -86,34 +124,8 @@ struct SpeechToTextView: View {
         }
     }
 
-    private var transcriptList: some View {
-        ScrollViewReader { proxy in
-            List {
-                if model.state.sessionState == .failure,
-                   let message = model.state.errorMessage
-                {
-                    Section {
-                        Label(
-                            message,
-                            systemImage: "exclamationmark.triangle",
-                        )
-                        if model.state.canOpenSystemSettings {
-                            OpenSettingsButton(
-                                openSettings: model.openSystemSettings,
-                            )
-                        }
-                    }
-                }
-                Section {
-                    Text(model.state.transcript)
-                        .textSelection(.enabled)
-                        .id("transcript-end")
-                }
-            }
-            .onChange(of: model.state.transcript) { _, _ in
-                proxy.scrollTo("transcript-end", anchor: .bottom)
-            }
-        }
+    private var showsTranscript: Bool {
+        !model.state.transcript.isEmpty && !model.state.showsConnecting
     }
 
     @ToolbarContentBuilder

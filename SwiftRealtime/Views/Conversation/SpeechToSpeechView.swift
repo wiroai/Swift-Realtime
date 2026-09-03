@@ -78,11 +78,43 @@ struct SpeechToSpeechView: View {
         }
     }
 
-    @ViewBuilder
+    /// The list is always the root: the large title and its subtitle
+    /// follow the root's scroll geometry, and a stage that only
+    /// overlays it cannot shift the title when the subtitle appears.
     private var stageContent: some View {
-        if model.state.showsConnecting
-            || (model.state.isRestoring && !hasTranscripts)
-        {
+        ScrollViewReader { proxy in
+            List {
+                if showsTranscripts {
+                    transcriptSections
+                }
+            }
+            .onChange(of: model.state.aiTranscript) { _, _ in
+                proxy.scrollTo("assistant-end", anchor: .bottom)
+            }
+        }
+        .overlay { emptyStage }
+    }
+
+    @ViewBuilder
+    private var transcriptSections: some View {
+        if !model.state.userTranscript.isEmpty {
+            Section(ConversationCopy.you) {
+                Text(model.state.userTranscript)
+                    .textSelection(.enabled)
+            }
+        }
+        if !model.state.aiTranscript.isEmpty {
+            Section(ConversationCopy.assistant) {
+                Text(model.state.aiTranscript)
+                    .textSelection(.enabled)
+                    .id("assistant-end")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var emptyStage: some View {
+        if showsConnecting {
             SessionStage.connecting
         } else if model.displayedStage == .failed,
                   let message = model.state.errorMessage
@@ -93,7 +125,7 @@ struct SpeechToSpeechView: View {
                 openSettings: model.openSystemSettings,
             )
         } else if hasTranscripts {
-            transcriptList
+            EmptyView()
         } else if isLive {
             SessionStage.listening(muted: model.state.muted)
         } else {
@@ -101,27 +133,14 @@ struct SpeechToSpeechView: View {
         }
     }
 
-    private var transcriptList: some View {
-        ScrollViewReader { proxy in
-            List {
-                if !model.state.userTranscript.isEmpty {
-                    Section(ConversationCopy.you) {
-                        Text(model.state.userTranscript)
-                            .textSelection(.enabled)
-                    }
-                }
-                if !model.state.aiTranscript.isEmpty {
-                    Section(ConversationCopy.assistant) {
-                        Text(model.state.aiTranscript)
-                            .textSelection(.enabled)
-                            .id("assistant-end")
-                    }
-                }
-            }
-            .onChange(of: model.state.aiTranscript) { _, _ in
-                proxy.scrollTo("assistant-end", anchor: .bottom)
-            }
-        }
+    private var showsConnecting: Bool {
+        model.state.showsConnecting
+            || (model.state.isRestoring && !hasTranscripts)
+    }
+
+    private var showsTranscripts: Bool {
+        hasTranscripts && !showsConnecting
+            && model.displayedStage != .failed
     }
 
     @ToolbarContentBuilder
