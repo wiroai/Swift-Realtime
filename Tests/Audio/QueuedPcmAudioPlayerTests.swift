@@ -117,6 +117,63 @@ final class QueuedPcmAudioPlayerTests: XCTestCase {
         await player.dispose()
     }
 
+    func testDuckingLowersTheSinkWithoutTouchingTheQueue() async throws {
+        let sink = FakePcmPlaybackSink()
+        let player = QueuedPcmAudioPlayer(sink)
+
+        try await player.start()
+        await player.enqueue(Data([1]))
+        player.setDucked(true)
+        player.setDucked(true)
+        await player.enqueue(Data([2]))
+        player.setDucked(false)
+        await player.complete()
+
+        await waitUntil { sink.volumes.count == 3 }
+        XCTAssertEqual(
+            sink.volumes,
+            [1, QueuedPcmAudioPlayer.duckedVolume, 1],
+        )
+        XCTAssertEqual(sink.fedChunks, [Data([1]), Data([2])])
+        XCTAssertEqual(sink.stopCalls, 0)
+        await player.dispose()
+    }
+
+    func testAMutedSpeakerStaysSilentWhileDucked() async throws {
+        let sink = FakePcmPlaybackSink()
+        let player = QueuedPcmAudioPlayer(sink)
+
+        try await player.start()
+        await player.setEnabled(false)
+        player.setDucked(true)
+        await player.setEnabled(true)
+        player.setDucked(false)
+
+        await waitUntil { sink.volumes.count == 5 }
+        XCTAssertEqual(
+            sink.volumes,
+            [1, 0, 0, QueuedPcmAudioPlayer.duckedVolume, 1],
+        )
+        await player.dispose()
+    }
+
+    func testStoppingForgetsTheDuckSoTheNextStartIsFull() async throws {
+        let sink = FakePcmPlaybackSink()
+        let player = QueuedPcmAudioPlayer(sink)
+
+        try await player.start()
+        player.setDucked(true)
+        await waitUntil { sink.volumes.count == 2 }
+        await player.stop()
+        try await player.start()
+
+        XCTAssertEqual(
+            sink.volumes,
+            [1, QueuedPcmAudioPlayer.duckedVolume, 1],
+        )
+        await player.dispose()
+    }
+
     func testReportsSanitizedPlaybackFailures() async throws {
         let sink = FakePcmPlaybackSink(failFeed: true)
         let player = QueuedPcmAudioPlayer(sink)

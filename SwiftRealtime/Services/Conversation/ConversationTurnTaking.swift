@@ -82,7 +82,7 @@ final class ConversationTurnTaking: @unchecked Sendable {
     /// keeps the activity model in step with what was actually queued.
     func acceptAssistantAudio(_ bytes: Data) -> PlaybackEnqueueResult {
         let outcome = playback.enqueue(bytes)
-        if outcome.silencedChunk || outcome.heldChunk {
+        if outcome.silencedChunk {
             return outcome
         }
         if outcome.flushedPreviousTurn {

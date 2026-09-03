@@ -133,6 +133,7 @@ final class FakeConversationPlayer:
     var stopCalls = 0
     var flushCalls = 0
     var disposeCalls = 0
+    private(set) var ducked = false
     private var playing = false
     private var enabled = true
 
@@ -174,6 +175,10 @@ final class FakeConversationPlayer:
 
     func setEnabled(_ enabled: Bool) async {
         self.enabled = enabled
+    }
+
+    func setDucked(_ ducked: Bool) {
+        self.ducked = ducked
     }
 
     func stop() async {

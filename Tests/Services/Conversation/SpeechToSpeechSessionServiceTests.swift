@@ -262,7 +262,7 @@ final class SpeechToSpeechSessionServiceTests: XCTestCase {
         await service.dispose()
     }
 
-    func testTheFirstSignOfUserSpeechHoldsPlaybackWithoutCommitting() async {
+    func testTheFirstSignOfUserSpeechDucksPlaybackWithoutCommitting() async {
         let dependencies = ConversationTestDependencies()
         let service = dependencies.createService()
         await service.start()
@@ -278,16 +278,20 @@ final class SpeechToSpeechSessionServiceTests: XCTestCase {
                 .contains("assistant_playback_held")
         }
 
-        XCTAssertEqual(dependencies.player.flushCalls, 1)
+        XCTAssertTrue(dependencies.player.ducked)
+        XCTAssertEqual(dependencies.player.flushCalls, 0)
         XCTAssertFalse(
             service.protocolEvents
                 .contains("assistant_interrupted"),
         )
 
-        // A held turn keeps its audio queued rather than fed, so a
-        // brief loud burst never actually loses the answer.
+        // The answer keeps playing under the duck, so a brief loud
+        // burst never loses a word of it.
         dependencies.session.emit(.binary(Data([9])))
-        XCTAssertTrue(dependencies.player.fedChunks.isEmpty)
+        XCTAssertEqual(
+            dependencies.player.fedChunks,
+            [Data(count: 48_000), Data([9])],
+        )
         await service.dispose()
     }
 

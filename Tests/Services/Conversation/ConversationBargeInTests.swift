@@ -40,11 +40,12 @@ final class ConversationBargeInTests: XCTestCase {
         super.tearDown()
     }
 
-    func testSuspectSpeechHoldsPlaybackWithoutCommitting() {
+    func testSuspectSpeechDucksPlaybackWithoutCommitting() {
         queueAssistantAudio()
         feedLoudUserChunks(count: 3)
 
-        XCTAssertEqual(player.flushes, 1)
+        XCTAssertTrue(player.ducked)
+        XCTAssertEqual(player.flushes, 0)
         XCTAssertTrue(playback.isHolding)
         XCTAssertEqual(events, ["assistant_playback_held"])
     }
@@ -53,6 +54,7 @@ final class ConversationBargeInTests: XCTestCase {
         queueAssistantAudio()
         feedLoudUserChunks(count: 2)
 
+        XCTAssertFalse(player.ducked)
         XCTAssertEqual(player.flushes, 0)
         XCTAssertTrue(events.isEmpty)
     }
@@ -85,11 +87,14 @@ final class ConversationBargeInTests: XCTestCase {
         }
 
         XCTAssertFalse(playback.isHolding)
+        XCTAssertFalse(player.ducked)
         XCTAssertEqual(
             events,
             ["assistant_playback_held", "assistant_playback_resumed"],
         )
-        XCTAssertFalse(player.enqueued.isEmpty)
+        // Nothing was taken off the player, so nothing has to go back.
+        XCTAssertEqual(player.flushes, 0)
+        XCTAssertEqual(player.enqueued.count, 1)
     }
 
     func testSustainedSpeechCommitsTheInterruption() {
@@ -97,6 +102,8 @@ final class ConversationBargeInTests: XCTestCase {
         feedLoudUserChunks(count: 8)
 
         XCTAssertFalse(playback.isHolding)
+        XCTAssertFalse(player.ducked)
+        XCTAssertEqual(player.flushes, 1)
         XCTAssertEqual(
             events,
             ["assistant_playback_held", "assistant_interrupted"],
@@ -176,13 +183,13 @@ final class ConversationBargeInTests: XCTestCase {
         }
         XCTAssertEqual(events.last, "assistant_playback_resumed")
 
-        // Rebuild a long assistant playhead after the resume reset Ai.
         queueAssistantAudio()
 
         // Still inside the cooldown: three loud chunks would
         // otherwise hold.
         feedLoudUserChunks(count: 3)
         XCTAssertFalse(playback.isHolding)
+        XCTAssertFalse(player.ducked)
         XCTAssertEqual(
             events.filter { $0 == "assistant_playback_held" }.count,
             1,

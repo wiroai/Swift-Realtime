@@ -12,14 +12,30 @@ final class QueuedPcmAudioPlayer: PcmAudioPlayer, @unchecked Sendable {
         var consumeTask: Task<Void, Never>?
         var playing = false
         var enabled = true
+        var ducked = false
         var initialized = false
         var disposed = false
         var playbackGeneration = 0
         var pendingFlush: Task<Void, Never>?
+        var pendingVolume: Task<Void, Never>?
         var flushCount = 0
         var consumedChunks = 0
         var consumeFinished = false
+
+        /// What the sink should be set to for the current switches.
+        var volume: Double {
+            guard enabled else {
+                return 0
+            }
+            return ducked ? QueuedPcmAudioPlayer.duckedVolume : 1
+        }
     }
+
+    /// Speaker level while a barge-in is only suspected: −12 dB. Low
+    /// enough that a voice over it is unmistakably the louder one and
+    /// that echo cancellation has little left to remove, high enough
+    /// that a false alarm reads as a dip rather than a gap.
+    static let duckedVolume = 0.25
 
     /// What the queue-facing entry points need to know, read in one
     /// go so an `enabled` toggle cannot land between the fields.
@@ -84,15 +100,15 @@ final class QueuedPcmAudioPlayer: PcmAudioPlayer, @unchecked Sendable {
             let queue = BoundedPcmQueue(
                 capacityInChunks: queueCapacityInChunks,
             )
-            let enabled = state.withLock { state -> Bool in
+            let volume = state.withLock { state -> Double in
                 state.initialized = true
                 state.queue = queue
                 state.playing = true
                 state.consumeFinished = false
                 state.playbackGeneration += 1
-                return state.enabled
+                return state.volume
             }
-            try await sink.setVolume(enabled ? 1 : 0)
+            try await sink.setVolume(volume)
             try await sink.play()
             let task = Task { [weak self] in
                 guard let self else {
@@ -193,29 +209,30 @@ final class QueuedPcmAudioPlayer: PcmAudioPlayer, @unchecked Sendable {
     }
 
     func setEnabled(_ enabled: Bool) async {
-        let (changed, initialized) = state.withLock {
-            state -> (Bool, Bool) in
+        let (changed, initialized, volume) = state.withLock {
+            state -> (Bool, Bool, Double) in
             if state.enabled == enabled {
-                return (false, state.initialized)
+                return (false, state.initialized, state.volume)
             }
             state.enabled = enabled
             state.playbackGeneration += 1
             if !enabled {
                 state.queue?.clear()
             }
-            return (true, state.initialized)
+            return (true, state.initialized, state.volume)
         }
         guard changed, initialized else {
             return
         }
         do {
+            await state.withLock(\.pendingVolume)?.value
             if enabled {
-                try await sink.setVolume(1)
+                try await sink.setVolume(volume)
                 if state.withLock(\.playing) {
                     try await sink.play()
                 }
             } else {
-                try await sink.setVolume(0)
+                try await sink.setVolume(volume)
                 try await sink.stop()
             }
         } catch {
@@ -223,9 +240,31 @@ final class QueuedPcmAudioPlayer: PcmAudioPlayer, @unchecked Sendable {
         }
     }
 
+    /// The sink is set on a task, chained behind the previous one, so
+    /// a duck and the un-duck right after it land in that order even
+    /// though neither caller waits.
+    func setDucked(_ ducked: Bool) {
+        state.withLock { state in
+            if state.ducked == ducked {
+                return
+            }
+            state.ducked = ducked
+            guard state.initialized else {
+                return
+            }
+            let volume = state.volume
+            let previous = state.pendingVolume
+            state.pendingVolume = Task { [weak self] in
+                await previous?.value
+                await self?.applyVolume(volume)
+            }
+        }
+    }
+
     func stop() async {
         let hasConsumer = state.withLock { state -> Bool in
             state.playing = false
+            state.ducked = false
             state.playbackGeneration += 1
             state.queue?.clear()
             state.queue?.close()
@@ -397,6 +436,17 @@ final class QueuedPcmAudioPlayer: PcmAudioPlayer, @unchecked Sendable {
         }
         do {
             try await sink.flush()
+        } catch {
+            reportFailure()
+        }
+    }
+
+    private func applyVolume(_ volume: Double) async {
+        guard state.withLock(\.initialized) else {
+            return
+        }
+        do {
+            try await sink.setVolume(volume)
         } catch {
             reportFailure()
         }

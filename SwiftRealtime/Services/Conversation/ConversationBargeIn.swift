@@ -1,10 +1,10 @@
 import Foundation
 import os
 
-/// Two-stage barge-in: a loud moment silences the assistant while
-/// keeping its audio; only input that sustains like speech commits
-/// the cut, while a noise burst hands the audio back from where it
-/// stopped.
+/// Two-stage barge-in: a loud moment ducks the assistant while its
+/// audio keeps playing; only input that sustains like speech commits
+/// the cut, while a noise burst just brings the volume back up. The
+/// cost of a wrong suspicion is a dip, never a gap or a lost word.
 ///
 /// The hold deadline runs on its own timer so a mute or a stalling
 /// mic mid-hold still resolves, rather than waiting on the next
@@ -132,16 +132,13 @@ final class ConversationBargeIn: @unchecked Sendable {
         onProtocolEvent("assistant_interrupted")
     }
 
-    /// The suspected interruption faded the way noise does: the held
-    /// audio goes back to the speaker from the point it was
-    /// silenced, and the playback model is rebuilt around what is
-    /// actually playing now.
+    /// The suspected interruption faded the way noise does: the
+    /// speaker comes back up, and holds rest for a while so the same
+    /// racket cannot keep dipping the answer.
     private func resumeHeldTurn() {
         cancelHold()
-        let resumed = playback.resumeHeldTurn()
-        voiceActivity.resetAi()
-        for chunk in resumed {
-            voiceActivity.addAiChunk(chunk)
+        guard playback.resumeHeldTurn() else {
+            return
         }
         let cooldownEnd = clock.now + holdCooldown
         state.withLock { state in

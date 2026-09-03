@@ -111,6 +111,8 @@ final class FakeSpeechPlayer: PcmAudioPlayer, @unchecked Sendable {
         self.enabled = enabled
     }
 
+    func setDucked(_: Bool) {}
+
     func stop() async {
         guard playing else {
             return

@@ -198,35 +198,32 @@ final class ConversationPlaybackCoordinatorTests: XCTestCase {
         XCTAssertEqual(player.enqueued, [chunk(1), chunk(3)])
     }
 
-    func testAHoldSilencesThePlayerButKeepsTheTurnResumable() {
+    func testAHoldDucksThePlayerAndLeavesTheTurnPlaying() {
         _ = coordinator.enqueue(secondLong(1))
 
         XCTAssertTrue(coordinator.holdTurn())
         XCTAssertTrue(coordinator.isHolding)
-        XCTAssertEqual(player.flushes, 1)
+        XCTAssertTrue(player.ducked)
+        XCTAssertEqual(player.flushes, 0)
+        XCTAssertEqual(player.enqueued, [secondLong(1)])
 
-        let resumed = coordinator.resumeHeldTurn()
+        XCTAssertTrue(coordinator.resumeHeldTurn())
 
         XCTAssertFalse(coordinator.isHolding)
-        XCTAssertEqual(resumed.count, 1)
-        XCTAssertLessThanOrEqual(resumed[0].count, 48_000)
-        XCTAssertGreaterThan(resumed[0].count, 40_000)
-        XCTAssertEqual(player.enqueued.count, 2)
+        XCTAssertFalse(player.ducked)
+        XCTAssertFalse(coordinator.resumeHeldTurn())
     }
 
-    func testChunksArrivingDuringAHoldPlayOnlyAfterTheResume() {
+    func testChunksArrivingDuringAHoldKeepPlayingDucked() {
         _ = coordinator.enqueue(secondLong(1))
         _ = coordinator.holdTurn()
 
-        let held = coordinator.enqueue(secondLong(2))
+        let outcome = coordinator.enqueue(secondLong(2))
 
-        XCTAssertTrue(held.heldChunk)
-        XCTAssertEqual(player.enqueued.count, 1)
-
-        let resumed = coordinator.resumeHeldTurn()
-
-        XCTAssertEqual(resumed.count, 2)
-        XCTAssertEqual(player.enqueued.count, 3)
+        XCTAssertFalse(outcome.droppedChunk)
+        XCTAssertFalse(outcome.flushedPreviousTurn)
+        XCTAssertTrue(player.ducked)
+        XCTAssertEqual(player.enqueued, [secondLong(1), secondLong(2)])
     }
 
     func testCommittingAHeldTurnDiscardsItsAudioAndLatches() {
@@ -234,7 +231,11 @@ final class ConversationPlaybackCoordinatorTests: XCTestCase {
         _ = coordinator.holdTurn()
 
         XCTAssertTrue(coordinator.interruptTurn())
-        XCTAssertTrue(coordinator.resumeHeldTurn().isEmpty)
+
+        XCTAssertFalse(coordinator.isHolding)
+        XCTAssertFalse(player.ducked)
+        XCTAssertEqual(player.flushes, 1)
+        XCTAssertFalse(coordinator.resumeHeldTurn())
 
         let silenced = coordinator.enqueue(secondLong(2))
 
@@ -244,40 +245,44 @@ final class ConversationPlaybackCoordinatorTests: XCTestCase {
 
     func testHoldingWithNothingUnplayedIsRefused() {
         XCTAssertFalse(coordinator.holdTurn())
-        XCTAssertEqual(player.flushes, 0)
+        XCTAssertFalse(player.ducked)
+
+        _ = coordinator.enqueue(secondLong(1))
+        _ = coordinator.interruptTurn()
+
+        XCTAssertFalse(coordinator.holdTurn())
+        XCTAssertFalse(player.ducked)
     }
 
-    func testAHoldAcrossTheTurnBoundaryResumesAsAFinishedTail() {
+    func testAHoldNeverStacks() {
+        _ = coordinator.enqueue(secondLong(1))
+
+        XCTAssertTrue(coordinator.holdTurn())
+        XCTAssertFalse(coordinator.holdTurn())
+        XCTAssertEqual(player.duckChanges, 1)
+    }
+
+    func testATurnBoundaryDuringAHoldStillClearsTheTail() {
         _ = coordinator.enqueue(secondLong(1))
         _ = coordinator.holdTurn()
         coordinator.markTurnFinished()
-        _ = coordinator.resumeHeldTurn()
 
         let outcome = coordinator.enqueue(secondLong(2))
 
         XCTAssertTrue(outcome.flushedPreviousTurn)
-    }
-
-    func testANewAnswerOverAHeldFinishedTailSupersedesIt() {
-        _ = coordinator.enqueue(secondLong(1))
-        coordinator.markTurnFinished()
-        _ = coordinator.holdTurn()
-
-        let outcome = coordinator.enqueue(secondLong(2))
-
-        XCTAssertFalse(outcome.heldChunk)
-        XCTAssertTrue(outcome.flushedPreviousTurn)
-        XCTAssertFalse(coordinator.isHolding)
+        XCTAssertTrue(coordinator.isHolding)
+        XCTAssertTrue(player.ducked)
         XCTAssertEqual(player.enqueued.last, secondLong(2))
     }
 
-    func testResetClearsAHoldSoNothingFromItEverResumes() {
+    func testResetClearsAHoldAndBringsTheSpeakerBack() {
         _ = coordinator.enqueue(secondLong(1))
         _ = coordinator.holdTurn()
         coordinator.reset()
 
         XCTAssertFalse(coordinator.isHolding)
-        XCTAssertTrue(coordinator.resumeHeldTurn().isEmpty)
+        XCTAssertFalse(player.ducked)
+        XCTAssertFalse(coordinator.resumeHeldTurn())
     }
 }
 
@@ -292,6 +297,8 @@ private func secondLong(_ seed: UInt8) -> Data {
 final class AlwaysAcceptPlayer: PcmAudioPlayer, @unchecked Sendable {
     var accepts = true
     var flushes = 0
+    var ducked = false
+    var duckChanges = 0
     var enqueued: [Data] = []
 
     var isPlaying: Bool { true }
@@ -310,6 +317,13 @@ final class AlwaysAcceptPlayer: PcmAudioPlayer, @unchecked Sendable {
 
     func flush() {
         flushes += 1
+    }
+
+    func setDucked(_ ducked: Bool) {
+        if self.ducked != ducked {
+            duckChanges += 1
+        }
+        self.ducked = ducked
     }
 
     func start() async throws {}

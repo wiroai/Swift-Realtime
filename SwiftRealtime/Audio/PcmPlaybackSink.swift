@@ -23,6 +23,9 @@ protocol PcmAudioPlayer: AnyObject, Sendable {
     func flush()
     func complete() async
     func setEnabled(_ enabled: Bool) async
+    /// Lowers the speaker without stopping it, and raises it back.
+    /// Synchronous so a barge-in can call it from the capture thread.
+    func setDucked(_ ducked: Bool)
     func stop() async
     func dispose() async
 }

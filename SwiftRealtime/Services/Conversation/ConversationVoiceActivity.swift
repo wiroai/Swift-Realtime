@@ -37,9 +37,9 @@ final class ConversationVoiceActivity: @unchecked Sendable {
     /// three chunks is sixty milliseconds, fast enough that the
     /// assistant feels silenced the instant the user starts talking.
     /// Keeping this trigger-happy is safe because suspicion only
-    /// pauses playback: nothing is discarded until
+    /// ducks the speaker: nothing is discarded until
     /// `confirmStreakTarget` proves the sound is speech, so a noise
-    /// burst costs a beat of silence rather than the rest of the
+    /// burst costs a dip in volume rather than the rest of the
     /// answer.
     static let suspectStreakTarget = 3
     /// Accumulated loud chunks it takes to call the suspicion speech

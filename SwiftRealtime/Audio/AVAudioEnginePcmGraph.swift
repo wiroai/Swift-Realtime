@@ -29,8 +29,10 @@ final class AVAudioEnginePcmGraph: @unchecked Sendable
     /// A flush cuts the player mid-waveform, which the ear hears as a
     /// click; ramping the node down first turns the cut into a short
     /// fade. The answer that follows ramps back up over its first
-    /// frames so it does not slam in after the silence. Both are kept
-    /// well under a syllable so the interruption still feels instant.
+    /// frames so it does not slam in after the silence, and a volume
+    /// change mid-playback — the barge-in duck — takes the same ramp.
+    /// Both are kept well under a syllable so the interruption still
+    /// feels instant.
     private static let fadeOutDuration: Duration = .milliseconds(80)
     private static let fadeInDuration: Duration = .milliseconds(40)
     private static let fadeStepDuration: Duration = .milliseconds(5)
@@ -183,11 +185,19 @@ final class AVAudioEnginePcmGraph: @unchecked Sendable
         return .seconds(Double(pending) / rate)
     }
 
+    /// Reaches the new level over a short ramp while something is
+    /// playing — a step of several decibels mid-waveform is a click —
+    /// and at once while the node is idle.
     func setVolume(_ volume: Double) async throws {
         let clamped = Float(min(1, max(0, volume)))
         cancelFade()
         state.withLock { $0.volume = clamped }
-        playerNode.volume = clamped
+        guard playerNode.isPlaying, await bufferedDuration() > .zero
+        else {
+            playerNode.volume = clamped
+            return
+        }
+        startRamp(to: clamped)
     }
 
     func endOfStream() async throws {
@@ -324,10 +334,10 @@ final class AVAudioEnginePcmGraph: @unchecked Sendable
         // echo residual — never fully removed by cancellation alone
         // — swings unevenly past `ConversationVoiceActivity`'s
         // interrupt threshold in bursts, which reads as the user
-        // interrupting the assistant's own voice. That repeatedly
-        // holds and flushes playback and then dumps the backlog at
-        // once, which is worse than the near-silent capture AGC
-        // otherwise leaves during a real interruption.
+        // interrupting the assistant's own voice. That keeps ducking
+        // the answer and, sustained, cuts it off, which is worse than
+        // the near-silent capture AGC otherwise leaves during a real
+        // interruption.
     }
 
     private func installTap() -> Bool {
@@ -493,8 +503,17 @@ final class AVAudioEnginePcmGraph: @unchecked Sendable
     /// configured volume, so the ramp never dips what is playing.
     private func startFadeIn() {
         let target = state.withLock(\.volume)
+        guard playerNode.volume < target else {
+            return
+        }
+        startRamp(to: target)
+    }
+
+    /// Moves the node to `target` in `fadeInDuration`, replacing any
+    /// ramp still under way from wherever that ramp had got to.
+    private func startRamp(to target: Float) {
         let from = playerNode.volume
-        guard from < target else {
+        guard from != target else {
             return
         }
         let steps = Int(Self.fadeInDuration / Self.fadeStepDuration)
