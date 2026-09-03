@@ -51,26 +51,29 @@ enum ConversationConfig {
     /// Example keys: `transcription_model`, `turn_detection_threshold`,
     /// `turn_detection_silence_ms`.
     ///
-    /// `turn_detection_threshold` is lowered from the catalog default
-    /// (0.75) so the model's own voice-activity detector — which
-    /// hears the same uplinked microphone audio this app sends —
-    /// notices a speaker starting up sooner and truncates its own
-    /// answer instead of talking over them. This is the only lever
-    /// that stops the model from generating in the first place; a
-    /// client that only flushes its local speaker queue cannot undo
-    /// audio the server has already decided to produce.
+    /// `turn_detection_threshold` is how sure the model's own voice
+    /// detector — which hears the same uplinked microphone audio this
+    /// app sends — has to be before it calls a sound speech. The
+    /// moment it does, it stops the answer it is giving and never
+    /// resumes it; this is the only lever that stops the model from
+    /// generating in the first place, and a client that flushes its
+    /// local speaker queue cannot undo audio the server has already
+    /// decided to produce. That makes the value a trade-off: low
+    /// enough that a person starting to talk is heard on their first
+    /// syllable, high enough that a keyboard click or a cough across
+    /// the room is not. 0.35 cut the assistant off on clicks; the
+    /// catalog's 0.75 makes a quiet speaker repeat themselves.
     ///
-    /// `turn_detection_silence_ms` is lowered from the catalog
-    /// default (700 ms) for the same reason: it is how long the
-    /// model waits after the uplink goes quiet before it decides the
-    /// speaker actually stopped and it may answer. Left at 700 ms, a
-    /// server that is still mid-answer when the speaker cuts in
-    /// keeps that long extra window before it registers the silence
-    /// that follows, which reads as the assistant ignoring the
-    /// interruption for the better part of a second.
+    /// `turn_detection_silence_ms` is left at the catalog default
+    /// (700 ms). It is how long the uplink has to stay quiet before
+    /// the model decides the speaker has finished and answers. It
+    /// has no bearing on how fast an interruption lands — that is the
+    /// threshold above — and shortening it only turns the pause in
+    /// the middle of a long sentence into the end of the turn, so
+    /// the model answers half a question and the transcript shows
+    /// the sentence in pieces.
     static let parameters: [String: String] = [
-        "turn_detection_threshold": "0.35",
-        "turn_detection_silence_ms": "350",
+        "turn_detection_threshold": "0.6",
     ]
 
     /// Catalog defaults, then `overrides`, then persona and voice.
