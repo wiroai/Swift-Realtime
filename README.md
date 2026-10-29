@@ -6,7 +6,7 @@
 
 Realtime voice AI for iOS in Swift and SwiftUI: live conversation, speech-to-text and text-to-speech with the Wiro AI API.
 
-[![Swift 6.0](https://img.shields.io/badge/Swift-6.0-111111?style=for-the-badge&color=111111&logo=swift&logoColor=white)](https://swift.org) [![iOS 26.0+](https://img.shields.io/badge/iOS-26.0%2B-111111?style=for-the-badge&color=111111&logo=apple&logoColor=white)](#requirements) [![License: MIT](https://img.shields.io/badge/License-MIT-111111?style=for-the-badge&color=111111)](LICENSE)
+[![Swift 6.0](https://img.shields.io/badge/Swift-6.0-111111?style=for-the-badge&color=111111&logo=swift&logoColor=white)](https://swift.org) [![iOS 26.0+](https://img.shields.io/badge/iOS-26.0%2B-111111?style=for-the-badge&color=111111&logo=apple&logoColor=white)](#requirements) [![CI](https://img.shields.io/github/actions/workflow/status/wiroai/Swift-Realtime/tests.yml?branch=main&style=for-the-badge&color=111111&label=CI&logo=githubactions&logoColor=white)](https://github.com/wiroai/Swift-Realtime/actions/workflows/tests.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-111111?style=for-the-badge&color=111111)](LICENSE)
 
 [Website](https://wiro.ai) · [Models](https://wiro.ai/models) · [Docs](https://wiro.ai/docs/realtime-voice-conversation) · [Dashboard](https://wiro.ai/panel)
 
