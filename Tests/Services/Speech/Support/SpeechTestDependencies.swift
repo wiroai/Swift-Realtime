@@ -59,10 +59,16 @@ final class FakeSpeechPlayer: PcmAudioPlayer, @unchecked Sendable {
     private var playing = false
     private var enabled = true
     private let holdComplete: Bool
-    private var completeGate: CheckedContinuation<Void, Never>?
+    /// The drain parks on its own task and the test releases it from
+    /// another thread; unlocked, the release can see a half-published
+    /// continuation.
+    private let completeGate = OSAllocatedUnfairLock<
+        CheckedContinuation<Void, Never>?,
+    >(initialState: nil)
 
     var isPlaying: Bool { playing }
     var isEnabled: Bool { enabled }
+    var isHoldingComplete: Bool { completeGate.withLock { $0 != nil } }
 
     init(holdComplete: Bool = false) {
         self.holdComplete = holdComplete
@@ -96,15 +102,14 @@ final class FakeSpeechPlayer: PcmAudioPlayer, @unchecked Sendable {
         completeCalls += 1
         if holdComplete {
             await withCheckedContinuation { continuation in
-                completeGate = continuation
+                completeGate.withLock { $0 = continuation }
             }
         }
         playing = false
     }
 
     func releaseComplete() {
-        completeGate?.resume()
-        completeGate = nil
+        takeCompleteGate()?.resume()
     }
 
     func setEnabled(_ enabled: Bool) async {
@@ -119,8 +124,15 @@ final class FakeSpeechPlayer: PcmAudioPlayer, @unchecked Sendable {
         }
         stopCalls += 1
         playing = false
-        completeGate?.resume()
-        completeGate = nil
+        takeCompleteGate()?.resume()
+    }
+
+    private func takeCompleteGate() -> CheckedContinuation<Void, Never>? {
+        completeGate.withLock { gate in
+            let held = gate
+            gate = nil
+            return held
+        }
     }
 
     func dispose() async {

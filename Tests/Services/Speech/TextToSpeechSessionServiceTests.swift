@@ -161,6 +161,9 @@ final class TextToSpeechSessionServiceTests: XCTestCase {
         await waitUntil {
             service.snapshot.sessionState == .stopping
         }
+        // The drain runs on its own task. Releasing it before it
+        // waits finds no gate, and the release is lost.
+        await waitUntil { dependencies.player.isHoldingComplete }
 
         XCTAssertEqual(
             dependencies.player.fedChunks,
