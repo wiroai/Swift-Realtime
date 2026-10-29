@@ -104,10 +104,7 @@ final class AVAudioEnginePcmGraph: @unchecked Sendable
         if busy {
             throw AudioFailure.capture
         }
-        guard restartEngineForCapture() else {
-            throw AudioFailure.capture
-        }
-        guard installTap() else {
+        guard restartEngineForCapture(), installTap() else {
             throw AudioFailure.capture
         }
         let pair = AsyncThrowingStream<Data, Error>.makeStream()
@@ -343,13 +340,12 @@ final class AVAudioEnginePcmGraph: @unchecked Sendable
     private func installTap() -> Bool {
         let input = engine.inputNode
         let native = input.outputFormat(forBus: 0)
-        guard native.sampleRate > 0, native.channelCount > 0 else {
-            return false
-        }
-        guard let converter = AVAudioConverter(
-            from: native,
-            to: wireFormat,
-        ) else {
+        guard native.sampleRate > 0, native.channelCount > 0,
+              let converter = AVAudioConverter(
+                  from: native,
+                  to: wireFormat,
+              )
+        else {
             return false
         }
         input.removeTap(onBus: 0)

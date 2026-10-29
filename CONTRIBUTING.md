@@ -34,8 +34,11 @@ swiftformat SwiftRealtime Tests --lint
 swiftlint lint --strict
 ```
 
-CI runs the same three commands plus an 80-column check. Install the
-tools with `brew install swiftformat swiftlint`.
+CI runs the same three commands plus an 80-column check, with the
+SwiftFormat and SwiftLint versions pinned in
+`.github/workflows/tests.yml`. Install the tools with
+`brew install swiftformat swiftlint`; a newer SwiftFormat can flag
+code that the pinned one accepts.
 
 ## What a good change looks like
 

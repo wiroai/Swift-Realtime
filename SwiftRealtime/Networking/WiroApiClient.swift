@@ -47,10 +47,9 @@ final class DefaultWiroApiClient: WiroApiClient, @unchecked Sendable {
         )
 
         try validateStatusCode(response.statusCode)
-        guard let dto = WiroRunResponseDTO(json: response.json) else {
-            throw WiroFailure.malformedResponse
-        }
-        guard let result = dto.result, let errors = dto.errors else {
+        guard let dto = WiroRunResponseDTO(json: response.json),
+              let result = dto.result, let errors = dto.errors
+        else {
             throw WiroFailure.malformedResponse
         }
         guard result else {
