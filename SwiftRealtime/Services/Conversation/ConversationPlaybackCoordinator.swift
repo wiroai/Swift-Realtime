@@ -90,9 +90,9 @@ final class ConversationPlaybackCoordinator: @unchecked Sendable {
 
     /// The server has moved past the cut turn without a
     /// `task_stream_end` of its own: it transcribed the speech that
-    /// interrupted it, or started dictating a new answer. Whatever
-    /// audio follows is that new answer, and silencing it would lose
-    /// the reply the user just asked for. Returns false when no
+    /// interrupted it, or sent the transcript of a finished reply.
+    /// Whatever audio follows is a new answer, and silencing it would
+    /// lose the reply the user just asked for. Returns false when no
     /// interruption was latched.
     func releaseInterruptedTurn() -> Bool {
         state.withLock { state in

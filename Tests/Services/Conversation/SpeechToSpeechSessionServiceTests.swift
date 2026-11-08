@@ -227,22 +227,24 @@ final class SpeechToSpeechSessionServiceTests: XCTestCase {
         await service.dispose()
     }
 
-    func testTheCutTurnsOwnTranscriptKeepsItSilenced() async {
+    func testAReplyThatStartsLikeThePreviousOneReleasesACutTurn() async {
+        // Each assistant transcript is a finished reply, never a
+        // growing copy of the one before, so a reply that starts with
+        // the previous reply's words is still a new answer.
         let dependencies = ConversationTestDependencies()
         let service = dependencies.createService()
         await service.start()
 
-        dependencies.session.emit(.output("TRANSCRIPT_AI:Once upon a"))
+        dependencies.session.emit(.output("TRANSCRIPT_AI:Yes"))
         dependencies.session.emit(.binary(Data(count: 48_000)))
         service.interruptAssistant()
 
-        dependencies.session.emit(
-            .output("TRANSCRIPT_AI:Once upon a time there was"),
-        )
-        dependencies.session.emit(.binary(Data([9])))
+        dependencies.session.emit(.output("TRANSCRIPT_AI:Yes, please"))
+        dependencies.session.emit(.binary(Data([7])))
 
-        XCTAssertTrue(dependencies.player.fedChunks.isEmpty)
-        XCTAssertFalse(
+        XCTAssertEqual(dependencies.player.fedChunks, [Data([7])])
+        XCTAssertEqual(service.snapshot.aiTranscript, "Yes, please")
+        XCTAssertTrue(
             service.protocolEvents
                 .contains("interrupted_turn_released"),
         )

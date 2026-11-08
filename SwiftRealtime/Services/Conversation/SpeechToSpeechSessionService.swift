@@ -906,9 +906,7 @@ final class SpeechToSpeechSessionService:
             runtime.record("task_output")
             publish(snapshot.copyWith(userTranscript: text))
         case let .ai(text):
-            if Self.startsANewAnswer(text, after: snapshot.aiTranscript) {
-                releaseInterruptedTurnIfNeeded()
-            }
+            releaseInterruptedTurnIfNeeded()
             runtime.record("task_output")
             publish(snapshot.copyWith(aiTranscript: text))
         case nil:
@@ -916,26 +914,14 @@ final class SpeechToSpeechSessionService:
         }
     }
 
-    /// Whether an assistant transcript belongs to a turn other than
-    /// the one whose text is on screen. The model dictates one turn
-    /// cumulatively, so a continuation always extends the text it
-    /// already sent; anything else is a fresh answer. An empty
-    /// previous text proves nothing either way and is treated as a
-    /// continuation, since a wrong release would let a cut turn's
-    /// audio back through.
-    static func startsANewAnswer(
-        _ text: String,
-        after previous: String,
-    ) -> Bool {
-        !previous.isEmpty && !text.hasPrefix(previous)
-    }
-
     /// A barge-in has no wire message on this protocol: the model
     /// only learns of it from the microphone, and the cut turn's
     /// `task_stream_end` is not guaranteed to arrive before the new
     /// answer's audio. The server's own transcripts are the earliest
-    /// proof it moved on — it heard the interruption, or it is
-    /// dictating something new — so they lift the latch that would
+    /// proof it moved on. Each one is a finished utterance or reply,
+    /// never a growing copy of an earlier one: a user transcript
+    /// means it heard the interruption, and an assistant transcript
+    /// means a reply is complete. Either lifts the latch that would
     /// otherwise swallow the whole next answer.
     private func releaseInterruptedTurnIfNeeded() {
         if turnTaking.releaseInterruptedTurn() {
