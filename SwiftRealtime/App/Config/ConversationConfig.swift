@@ -98,18 +98,20 @@ enum ConversationConfig {
     /// How long a conversation is held for a speaker who left the
     /// screen, before it ends itself.
     ///
-    /// Zero — leave the screen and the conversation is over — because
-    /// Wiro bills a realtime task by how long it stays up, not by how
-    /// much is said into it. A held task is a meter running for someone
-    /// who is not there. The server takes the same view and stops a
-    /// task that has gone quiet on its own, so a long hold cannot be
-    /// relied on anyway.
+    /// Zero, so leaving the screen ends the conversation. Wiro charges
+    /// a realtime task turn by turn while it runs, and what a turn
+    /// costs depends on the model: `openai/gpt-realtime-mini` is priced
+    /// by the tokens of each reply, while a time-priced model charges
+    /// for the session time since its previous charge. A held task
+    /// keeps the model session open for someone who is not there, and
+    /// on a time-priced model that time is charged. The server also
+    /// closes a session after 30 seconds without speech, so a long hold
+    /// cannot be relied on anyway.
     ///
     /// Raising it buys continuity: returning within the window rejoins
     /// the same task, and the assistant still remembers the
     /// conversation instead of starting over as a stranger. Keep it
-    /// well under the server's own silence timeout — currently around
-    /// twenty seconds — or the hold ends in a dead task and a wasted
-    /// charge.
+    /// well under the server's 30-second timeout, or the server closes
+    /// the session before the speaker is back.
     static let suspendGracePeriod = Duration.zero
 }
