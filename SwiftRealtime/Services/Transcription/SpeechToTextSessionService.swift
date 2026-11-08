@@ -34,8 +34,7 @@ final class SpeechToTextSessionService:
     private let startFlight = SingleFlight()
     private let stopFlight = SingleFlight()
 
-    private var confirmedTranscript = ""
-    private var liveSegment = ""
+    private var transcript = ""
     private var pcmTask: Task<Void, Never>?
     private var naturalCompletion: Task<Void, Never>?
     private var naturalCompletionRunning = false
@@ -153,8 +152,7 @@ final class SpeechToTextSessionService:
         if operationGuard.isDisposed || snapshot.sessionState.isActive {
             return
         }
-        confirmedTranscript = ""
-        liveSegment = ""
+        transcript = ""
         publish(snapshot.copyWith(transcript: ""))
     }
 
@@ -216,8 +214,7 @@ final class SpeechToTextSessionService:
     private func startSession() async {
         let operationId = operationGuard.begin()
         runtime.diagnostics.clear()
-        confirmedTranscript = ""
-        liveSegment = ""
+        transcript = ""
         publish(
             snapshot.copyWith(
                 sessionState: .requestingPermission,
@@ -494,14 +491,13 @@ final class SpeechToTextSessionService:
         }
     }
 
-    /// Folds one transcript event into the running text.
+    /// Appends one transcript piece to the running text.
     ///
-    /// The model streams each utterance progressively and starts
-    /// over at the next one, so a raw replace would leave only the
-    /// final fragment of the last sentence on screen. An event that
-    /// extends the live utterance refines it in place; an event that
-    /// does not is a new utterance, and the finished one moves into
-    /// the confirmed text for good.
+    /// Each `TRANSCRIPT_USER` message carries only new text, often a
+    /// single word or a short phrase, and never repeats or revises an
+    /// earlier one. The full transcript is every non-empty piece,
+    /// trimmed and joined with single spaces, which is also how the
+    /// server saves it.
     private func handleOutput(_ message: String) {
         runtime.record("task_output")
         guard message.hasPrefix(Self.transcriptPrefix) else {
@@ -514,20 +510,8 @@ final class SpeechToTextSessionService:
         if text.isEmpty {
             return
         }
-        if text.hasPrefix(liveSegment) || liveSegment.isEmpty {
-            liveSegment = text
-        } else if !liveSegment.hasPrefix(text) {
-            confirmedTranscript = joinedTranscript
-            liveSegment = text
-        }
-        publish(snapshot.copyWith(transcript: joinedTranscript))
-    }
-
-    private var joinedTranscript: String {
-        if confirmedTranscript.isEmpty {
-            return liveSegment
-        }
-        return "\(confirmedTranscript) \(liveSegment)"
+        transcript = transcript.isEmpty ? text : "\(transcript) \(text)"
+        publish(snapshot.copyWith(transcript: transcript))
     }
 
     private func handleStreamEnded(_ operationId: Int) async {

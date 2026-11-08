@@ -32,58 +32,57 @@ final class SpeechToTextSessionServiceTests: XCTestCase {
         await service.dispose()
     }
 
-    func testAGrowingUtteranceRefinesTheTranscriptInPlace() async {
+    func testEachTranscriptPieceIsAppendedWithOneSpace() async {
         let dependencies = TranscriptionTestDependencies()
         let service = dependencies.createService()
         await service.start()
 
-        dependencies.session.emit(.output("TRANSCRIPT_USER:Hello"))
-        dependencies.session.emit(
-            .output("TRANSCRIPT_USER:Hello world"),
-        )
+        dependencies.session.emit(.output("TRANSCRIPT_USER:If"))
+        dependencies.session.emit(.output("TRANSCRIPT_USER:I"))
+        dependencies.session.emit(.output("TRANSCRIPT_USER:could"))
 
-        XCTAssertEqual(service.snapshot.transcript, "Hello world")
+        XCTAssertEqual(service.snapshot.transcript, "If I could")
         XCTAssertEqual(
             service.protocolEvents.filter {
                 $0 == "task_output"
             }.count,
-            2,
+            3,
         )
         await service.dispose()
     }
 
-    func testANewUtteranceJoinsTheTranscriptInsteadOfErasingIt()
-        async
-    {
+    func testAPieceThatStartsWithThePreviousOneIsKept() async {
         let dependencies = TranscriptionTestDependencies()
         let service = dependencies.createService()
         await service.start()
 
-        dependencies.session.emit(
-            .output("TRANSCRIPT_USER:Hello world."),
-        )
-        dependencies.session.emit(.output("TRANSCRIPT_USER:How are"))
-        dependencies.session.emit(
-            .output("TRANSCRIPT_USER:How are you?"),
-        )
-        dependencies.session.emit(.output("TRANSCRIPT_USER:Good."))
+        dependencies.session.emit(.output("TRANSCRIPT_USER:we"))
+        dependencies.session.emit(.output("TRANSCRIPT_USER:were"))
 
-        XCTAssertEqual(
-            service.snapshot.transcript,
-            "Hello world. How are you? Good.",
-        )
+        XCTAssertEqual(service.snapshot.transcript, "we were")
         await service.dispose()
     }
 
-    func testAShorterReEmitOfTheLiveUtteranceChangesNothing() async {
+    func testARepeatedPieceIsKept() async {
         let dependencies = TranscriptionTestDependencies()
         let service = dependencies.createService()
         await service.start()
 
-        dependencies.session.emit(
-            .output("TRANSCRIPT_USER:Hello world"),
-        )
+        dependencies.session.emit(.output("TRANSCRIPT_USER:the"))
+        dependencies.session.emit(.output("TRANSCRIPT_USER:the"))
+
+        XCTAssertEqual(service.snapshot.transcript, "the the")
+        await service.dispose()
+    }
+
+    func testAWhitespaceOnlyPieceIsIgnored() async {
+        let dependencies = TranscriptionTestDependencies()
+        let service = dependencies.createService()
+        await service.start()
+
         dependencies.session.emit(.output("TRANSCRIPT_USER:Hello"))
+        dependencies.session.emit(.output("TRANSCRIPT_USER:   "))
+        dependencies.session.emit(.output("TRANSCRIPT_USER: world "))
 
         XCTAssertEqual(service.snapshot.transcript, "Hello world")
         await service.dispose()
